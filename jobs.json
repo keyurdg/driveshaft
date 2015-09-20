@@ -1,0 +1,19 @@
+{
+    "http_uri": "http://localhost/job.php",
+    "server_timeout": 5000,
+    "worker_count": 8,
+    "servers_list":
+    [
+        "localhost"
+    ],
+    "independent_workers":
+    {
+        "ShopStats": 1
+    },
+    "regular_workers":
+    [
+        "Sum3",
+        "Sum",
+        "Sum2"
+    ]
+}
