@@ -29,14 +29,14 @@ class MainLoop {
 
 public:
     static MainLoop& getInstance(const std::string& config_file) noexcept;
-    void run() noexcept;
+    void run();
 
 private:
     MainLoop(const std::string& config_file) noexcept;
     bool setupSignals() const noexcept;
     void doShutdown(uint32_t wait) noexcept;
     void modifyPool(const std::string& name) noexcept;
-    bool loadConfig(DriveshaftConfig& new_config) noexcept;
+    bool loadConfig(DriveshaftConfig& new_config);
     void checkRunningConfigAndRegistry() noexcept;
 
     ~MainLoop() = default;

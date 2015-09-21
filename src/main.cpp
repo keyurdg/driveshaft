@@ -32,9 +32,11 @@ log4cxx::LoggerPtr ThreadLogger(log4cxx::Logger::getLogger(THREAD_LOGGER_NAME));
 }
 
 int main(int argc, char **argv) {
+    int rc;
     std::string jobs_config_file;
     std::string log_config_file;
 
+    /* Parse command line opts */
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
     desc.add_options()
@@ -57,6 +59,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    /* Load log config */
     try {
         log4cxx::xml::DOMConfigurator::configure(log_config_file);
     } catch (log4cxx::helpers::Exception& e) {
@@ -67,12 +70,23 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    /* Globals */
+    /* Global init */
     Driveshaft::g_force_shutdown = false;
     curl_global_init(CURL_GLOBAL_ALL);
 
-    Driveshaft::MainLoop::getInstance(jobs_config_file).run();
+    /* Enter main loop */
+    rc = 0;
+    try {
+        Driveshaft::MainLoop::getInstance(jobs_config_file).run();
+    } catch (std::exception& e) {
+        std::cout << "MainLoop threw exception: " << e.what() << std::endl;
+        rc = 1;
+    } catch (...) {
+        std::cout << "MainLoop threw exception" << std::endl;
+        rc = 1;
+    }
 
+    /* Global cleanup */
     curl_global_cleanup();
-    return 0;
+    return rc;
 }

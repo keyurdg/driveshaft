@@ -69,7 +69,7 @@ void MainLoop::doShutdown(uint32_t wait) noexcept {
     std::this_thread::sleep_for(std::chrono::seconds(wait));
 }
 
-void MainLoop::run() noexcept {
+void MainLoop::run() {
     auto operate = [this](const StringSet &list) {
         for (auto const& i : list) {
             modifyPool(i);
@@ -206,7 +206,7 @@ static const char* CONFIG_KEY_POOLS_LIST = "pools_list";
 static const char* CONFIG_KEY_POOL_WORKER_COUNT = "worker_count";
 static const char* CONFIG_KEY_POOL_JOBS_LIST = "jobs_list";
 
-bool MainLoop::loadConfig(DriveshaftConfig& new_config) noexcept {
+bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
     struct stat sb;
     if (stat(m_config_filename.c_str(), &sb) == -1) {
         char buffer[1024];
