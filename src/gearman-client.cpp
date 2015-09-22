@@ -106,6 +106,9 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     const char *job_handle = static_cast<const char *>(gearman_job_handle(job_ptr));
     const char *job_unique = static_cast<const char *>(gearman_job_unique(job_ptr));
     std::string job_workload(static_cast<const char *>(gearman_job_workload(job_ptr)), gearman_job_workload_size(job_ptr));
+    char error_buf[CURL_ERROR_SIZE];
+    error_buf[0] = 0;
+
 
     curl = curl_easy_init();
     if (!curl) {
@@ -164,6 +167,11 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         LOG4CXX_ERROR(ThreadLogger, "Unable to set headers");
         goto error;
     }
+    if (curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, error_buf) != 0) {
+        LOG4CXX_ERROR(ThreadLogger, "Unable to set errorbuffer");
+        goto error;
+    }
+
 
     /* Post data */
     LOG4CXX_INFO(ThreadLogger, "Starting job: function=" << job_function_name << " handle=" << job_handle << " unique=" << job_unique
@@ -194,7 +202,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     }
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        LOG4CXX_ERROR(ThreadLogger, "Failed to perform curl. Error: " << curl_easy_strerror(res));
+        LOG4CXX_ERROR(ThreadLogger, "Failed to perform curl. Error: " << curl_easy_strerror(res) << " Message: " << error_buf);
         goto error;
     } else {
         /* check HTTP response code */
