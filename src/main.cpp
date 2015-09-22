@@ -61,6 +61,8 @@ int main(int argc, char **argv) {
 
     /* Load log config */
     try {
+        /* ::configure may segfault on log4cxx <= 0.10 if log_config_file is
+           invalid. This is fixed in log4cxx trunk. */
         log4cxx::xml::DOMConfigurator::configure(log_config_file);
     } catch (log4cxx::helpers::Exception& e) {
         std::cout << e.what() << std::endl;
