@@ -203,6 +203,7 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) noexcept {
 
     if (sb.st_mtime > m_config.m_load_time) {
         LOG4CXX_INFO(MainLogger, "Reloading config");
+        //what's the difference between using a boost::property_tree here vs. Json::Value in gearman-client?
         namespace pt = boost::property_tree;
         pt::ptree tree;
         try {
