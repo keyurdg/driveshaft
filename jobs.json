@@ -6,14 +6,33 @@
     [
         "localhost"
     ],
-    "independent_workers":
+    "pools_list":
     {
-        "ShopStats": 1
-    },
-    "regular_workers":
-    [
-        "Sum3",
-        "Sum",
-        "Sum2"
-    ]
+        "ShopStats":
+        {
+            "worker_count": 0,
+            "jobs_list":
+            [
+                "ShopStats"
+            ]
+        },
+        "Newsfeed":
+        {
+            "worker_count": 0,
+            "jobs_list":
+            [
+                "Newsfeed"
+            ]
+        },
+        "Regular":
+        {
+            "worker_count": 0,
+            "jobs_list":
+            [
+                "Sum3",
+                "Sum",
+                "Sum2"
+            ]
+        }
+    }
 }

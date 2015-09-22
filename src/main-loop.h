@@ -5,6 +5,7 @@
 #include <map>
 #include <utility>
 #include <time.h>
+#include "dist/json/json.h"
 #include "common-defs.h"
 #include "thread-registry.h"
 
@@ -49,6 +50,7 @@ private:
     std::string m_config_filename;
     DriveshaftConfig m_config;
     ThreadRegistryPtr m_thread_registry;
+    std::unique_ptr<Json::CharReader> m_json_parser;
 };
 
 } // namespace Driveshaft

@@ -4,8 +4,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+#include <fstream>
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/adaptors.hpp>
 #include <exception>
@@ -24,10 +23,18 @@ MainLoop& MainLoop::getInstance(const std::string& config_file) noexcept {
     return singleton;
 }
 
-MainLoop::MainLoop(const std::string& config_file) noexcept : m_config_filename(config_file), m_config(), m_thread_registry(new ThreadRegistry()) {
+MainLoop::MainLoop(const std::string& config_file) noexcept
+    : m_config_filename(config_file)
+    , m_config()
+    , m_thread_registry(new ThreadRegistry())
+    , m_json_parser(nullptr) {
     if (setupSignals()) {
         throw std::runtime_error("Unable to setup signals");
     }
+
+    Json::CharReaderBuilder jsonfactory;
+    jsonfactory.strictMode(&jsonfactory.settings_);
+    m_json_parser.reset(jsonfactory.newCharReader());
 }
 
 enum class ShutdownType {
@@ -198,54 +205,80 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) noexcept {
         char buffer[1024];
         strerror_r(errno, buffer, 1024);
         LOG4CXX_ERROR(MainLogger, "Unable to stat file " << m_config_filename << ". Error: " << buffer);
-        throw std::runtime_error("stat failure");
+        throw std::runtime_error("confing stat failure");
     }
 
     if (sb.st_mtime > m_config.m_load_time) {
         LOG4CXX_INFO(MainLogger, "Reloading config");
-        //what's the difference between using a boost::property_tree here vs. Json::Value in gearman-client?
-        namespace pt = boost::property_tree;
-        pt::ptree tree;
-        try {
-            pt::read_json(m_config_filename, tree);
 
-            new_config.m_load_time = sb.st_mtime;
-            new_config.m_servers_list.clear();
-            new_config.m_timeout = tree.get<uint32_t>("server_timeout");
-            new_config.m_http_uri = tree.get<std::string>("http_uri");
-            new_config.m_pool_map.clear();
-
-            LOG4CXX_DEBUG(MainLogger, "New config: URI=" << new_config.m_http_uri <<
-                          " timeout=" << new_config.m_timeout);
-
-            for (auto&v : tree.get_child("servers_list")) {
-                std::string name = v.second.get_value<std::string>();
-                LOG4CXX_DEBUG(MainLogger, "Read server: " << name);
-                new_config.m_servers_list.insert(name);
-            }
-
-            for (auto& v : tree.get_child("independent_workers")) {
-                std::string name = v.first;
-                uint32_t count = v.second.get_value<uint32_t>(0);
-                LOG4CXX_DEBUG(MainLogger, "Read independent member: " << name << " with count " << count);
-                auto& pooldata = new_config.m_pool_map[name];
-                pooldata.first = count;
-                pooldata.second.insert(name);
-            }
-
-            auto& pooldata = new_config.m_pool_map[""]; // Global "All" pool
-            pooldata.first = tree.get<uint32_t>("worker_count");
-            for (auto& v : tree.get_child("regular_workers")) {
-                std::string name = v.second.get_value<std::string>();
-                LOG4CXX_DEBUG(MainLogger, "Read regular pool member: " << name);
-                pooldata.second.insert(name);
-            }
-
-            return true;
-        } catch (std::exception& e) {
-            LOG4CXX_ERROR(MainLogger, "Error parsing config " << e.what());
-            throw;
+        std::ifstream fd(m_config_filename);
+        if (fd.fail()) {
+            LOG4CXX_ERROR(MainLogger, "Unable to load file " << m_config_filename);
+            throw std::runtime_error("config read failure");
         }
+
+        Json::Value tree;
+        std::string parse_errors;
+        std::string file_data;
+        file_data.append(std::istreambuf_iterator<char>(fd),
+                         std::istreambuf_iterator<char>());
+
+        if (!m_json_parser->parse(file_data.data(),
+                                  file_data.data() + file_data.length(),
+                                  &tree, &parse_errors)) {
+            LOG4CXX_ERROR(MainLogger, "Failed to parse " << m_config_filename << ". Errors: " << parse_errors);
+            throw std::runtime_error("config parse failure");
+        }
+
+        if (!tree.isMember("server_timeout") ||
+            !tree.isMember("http_uri") ||
+            !tree.isMember("servers_list") ||
+            !tree.isMember("pools_list")) {
+            LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") is missing one or more key elements (server_timeout, http_uri, servers_list, pools_list)");
+            throw std::runtime_error("config parse failure");
+        }
+
+        new_config.m_load_time = sb.st_mtime;
+        new_config.m_servers_list.clear();
+        new_config.m_pool_map.clear();
+
+        new_config.m_timeout = tree["server_timeout"].asUInt();
+        new_config.m_http_uri = tree["http_uri"].asString();
+
+        LOG4CXX_DEBUG(MainLogger, "New config: URI=" << new_config.m_http_uri <<
+                      " timeout=" << new_config.m_timeout);
+
+        const auto& servers_list = tree["servers_list"];
+        for (auto i = servers_list.begin(); i != servers_list.end(); ++i) {
+            const auto& name = i->asString();
+            LOG4CXX_DEBUG(MainLogger, "Read server: " << name);
+            new_config.m_servers_list.insert(name);
+        }
+
+        const auto& pools_list = tree["pools_list"];
+        for (auto i = pools_list.begin(); i != pools_list.end(); ++i) {
+            const auto& pool_name = i.name();
+            const auto& data = *i;
+
+            if (!data.isMember("worker_count") || !data.isMember("jobs_list")) {
+                LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") is missing one or more key in pools_list (worker_count, jobs_list)");
+                throw std::runtime_error("jobs_list config parse failure");
+            }
+
+            uint32_t count = data["worker_count"].asUInt();
+            LOG4CXX_DEBUG(MainLogger, "Read pool: " << pool_name << " with count " << count);
+
+            const auto& jobs_list = data["jobs_list"];
+            auto& pooldata = new_config.m_pool_map[pool_name];
+            pooldata.first = count;
+
+            for (auto j = jobs_list.begin(); j != jobs_list.end(); ++j) {
+                LOG4CXX_DEBUG(MainLogger, "Pool " << pool_name << " adding job " << j->asString());
+                pooldata.second.insert(j->asString());
+            }
+        }
+
+        return true;
     }
 
     return false;
