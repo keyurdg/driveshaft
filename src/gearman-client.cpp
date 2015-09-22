@@ -100,6 +100,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     struct curl_slist *headerlist = nullptr;
     gearman_return_t gearman_ret = GEARMAN_SUCCESS;
     time_t start_ts = time(nullptr);
+    //What's the reason for sending a blank Expect: header?
     static const char expect_buf[] = "Expect:";
     std::stringstream raw_resp;
     const char *job_function_name = static_cast<const char *>(gearman_job_function_name(job_ptr));
@@ -190,16 +191,18 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         LOG4CXX_ERROR(ThreadLogger, "Unable to add unique to post: " << formerror);
         goto error;
     }
+    //job_workload is available, is the reason for explicit content length sizing to allow for null characters in workloads? could this be:
+    //formerror = curl_formadd(&formpost, &lastptr, CURLFORM_PTRNAME, "workload", CURLFORM_PTRCONTENTS, job_workload.c_str()) ?
     if ((formerror = curl_formadd(&formpost, &lastptr, CURLFORM_PTRNAME, "workload", CURLFORM_PTRCONTENTS, gearman_job_workload(job_ptr), CURLFORM_CONTENTSLENGTH, gearman_job_workload_size(job_ptr), CURLFORM_END)) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to add workload to post: " << formerror);
         goto error;
     }
 
-    /* Do it! */
     if (curl_easy_setopt(curl, CURLOPT_HTTPPOST, formpost) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to set form POST data");
         goto error;
     }
+    /* Do it! */
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
         LOG4CXX_ERROR(ThreadLogger, "Failed to perform curl. Error: " << curl_easy_strerror(res) << " Message: " << error_buf);
@@ -224,6 +227,8 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
                 LOG4CXX_ERROR(ThreadLogger, "Malformed response from worker: " << raw_resp.str());
                 goto error;
             }
+            //what constant does the literal value 0 map to?
+            //(though I guess it doesn't matter as we already checked for it's presence in the conditional above?)
             gearman_ret = (gearman_return_t)(tree.get("gearman_ret", 0).asInt());
             return_string.append(tree.get("response_string", "").asString());
 
@@ -231,6 +236,8 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
                                        << " workload=" << job_workload
                                        << " return_code=" << gearman_ret << " response_string=" << return_string);
         } catch (...) {
+            //is it possible to reference the exception encountered here? this message doesn't give much
+            //to go on
             LOG4CXX_ERROR(ThreadLogger, "Unable to parse response due to unexpected exception");
             goto error;
         }
