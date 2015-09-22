@@ -128,15 +128,15 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         goto error;
     }
     if (curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1) != 0) {
-        LOG4CXX_ERROR(ThreadLogger, "Unable to set nosignal");
+        LOG4CXX_ERROR(ThreadLogger, "Unable to set tcp_keepalive");
         goto error;
     }
     if (curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, 120L) != 0) {
-        LOG4CXX_ERROR(ThreadLogger, "Unable to set nosignal");
+        LOG4CXX_ERROR(ThreadLogger, "Unable to set tcp_keepidle");
         goto error;
     }
     if (curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, 60L) != 0) {
-        LOG4CXX_ERROR(ThreadLogger, "Unable to set nosignal");
+        LOG4CXX_ERROR(ThreadLogger, "Unable to set tcp_keepintvl");
         goto error;
     }
     if (curl_easy_setopt(curl, CURLOPT_URL, m_http_uri.c_str()) != 0) {
