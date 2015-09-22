@@ -235,8 +235,9 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
             goto error;
         }
 
-        if (!tree.isMember("gearman_ret") || !tree.isMember("response_string")) {
-            LOG4CXX_ERROR(ThreadLogger, "Malformed response from worker. Missing one or more key elements (gearman_ret, response_string): " << raw_resp.str());
+        if (!tree.isMember("gearman_ret") || !tree.isMember("response_string") ||
+            !tree["gearman_ret"].isUInt() || !tree["response_string"].isString()) {
+            LOG4CXX_ERROR(ThreadLogger, "Malformed response from worker. Invalid elements (gearman_ret, response_string): " << raw_resp.str());
             goto error;
         }
 

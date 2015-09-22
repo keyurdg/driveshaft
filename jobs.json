@@ -1,8 +1,7 @@
 {
     "http_uri": "http://localhost/job.php",
-    "server_timeout": 5000,
-    "worker_count": 8,
-    "servers_list":
+    "gearman_server_timeout": 5000,
+    "gearman_servers_list":
     [
         "localhost"
     ],
@@ -10,7 +9,7 @@
     {
         "ShopStats":
         {
-            "worker_count": 0,
+            "worker_count": 20,
             "jobs_list":
             [
                 "ShopStats"
@@ -18,7 +17,7 @@
         },
         "Newsfeed":
         {
-            "worker_count": 0,
+            "worker_count": 30,
             "jobs_list":
             [
                 "Newsfeed"
@@ -26,7 +25,7 @@
         },
         "Regular":
         {
-            "worker_count": 0,
+            "worker_count": 40,
             "jobs_list":
             [
                 "Sum3",

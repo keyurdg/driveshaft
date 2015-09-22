@@ -199,13 +199,20 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
     }
 }
 
+static const char* CONFIG_KEY_GEARMAN_SERVER_TIMEOUT = "gearman_server_timeout";
+static const char* CONFIG_KEY_GEARMAN_SERVERS_LIST = "gearman_servers_list";
+static const char* CONFIG_KEY_HTTP_URI = "http_uri";
+static const char* CONFIG_KEY_POOLS_LIST = "pools_list";
+static const char* CONFIG_KEY_POOL_WORKER_COUNT = "worker_count";
+static const char* CONFIG_KEY_POOL_JOBS_LIST = "jobs_list";
+
 bool MainLoop::loadConfig(DriveshaftConfig& new_config) noexcept {
     struct stat sb;
     if (stat(m_config_filename.c_str(), &sb) == -1) {
         char buffer[1024];
         strerror_r(errno, buffer, 1024);
         LOG4CXX_ERROR(MainLogger, "Unable to stat file " << m_config_filename << ". Error: " << buffer);
-        throw std::runtime_error("confing stat failure");
+        throw std::runtime_error("config stat failure");
     }
 
     if (sb.st_mtime > m_config.m_load_time) {
@@ -230,51 +237,73 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) noexcept {
             throw std::runtime_error("config parse failure");
         }
 
-        if (!tree.isMember("server_timeout") ||
-            !tree.isMember("http_uri") ||
-            !tree.isMember("servers_list") ||
-            !tree.isMember("pools_list")) {
-            LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") is missing one or more key elements (server_timeout, http_uri, servers_list, pools_list)");
+        if (!tree.isMember(CONFIG_KEY_GEARMAN_SERVER_TIMEOUT) ||
+            !tree.isMember(CONFIG_KEY_GEARMAN_SERVERS_LIST) ||
+            !tree.isMember(CONFIG_KEY_HTTP_URI) ||
+            !tree.isMember(CONFIG_KEY_POOLS_LIST) ||
+            !tree[CONFIG_KEY_GEARMAN_SERVER_TIMEOUT].isUInt() ||
+            !tree[CONFIG_KEY_HTTP_URI].isString() ||
+            !tree[CONFIG_KEY_GEARMAN_SERVERS_LIST].isArray() ||
+            !tree[CONFIG_KEY_POOLS_LIST].isObject()) {
+            LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") has one or more key malformed elements (" <<
+                                      CONFIG_KEY_GEARMAN_SERVER_TIMEOUT << ", " <<
+                                      CONFIG_KEY_GEARMAN_SERVERS_LIST << ", " <<
+                                      CONFIG_KEY_HTTP_URI << ", " <<
+                                      CONFIG_KEY_POOLS_LIST << ")");
             throw std::runtime_error("config parse failure");
         }
 
         new_config.m_load_time = sb.st_mtime;
+
         new_config.m_servers_list.clear();
         new_config.m_pool_map.clear();
 
-        new_config.m_timeout = tree["server_timeout"].asUInt();
-        new_config.m_http_uri = tree["http_uri"].asString();
+        new_config.m_timeout = tree[CONFIG_KEY_GEARMAN_SERVER_TIMEOUT].asUInt();
+        new_config.m_http_uri = tree[CONFIG_KEY_HTTP_URI].asString();
 
         LOG4CXX_DEBUG(MainLogger, "New config: URI=" << new_config.m_http_uri <<
                       " timeout=" << new_config.m_timeout);
 
-        const auto& servers_list = tree["servers_list"];
+        const auto& servers_list = tree[CONFIG_KEY_GEARMAN_SERVERS_LIST];
         for (auto i = servers_list.begin(); i != servers_list.end(); ++i) {
+            if (!i->isString()) {
+                LOG4CXX_ERROR(MainLogger, CONFIG_KEY_GEARMAN_SERVERS_LIST << " does not contain strings");
+                throw std::runtime_error("config server list type failure");
+            }
+
             const auto& name = i->asString();
             LOG4CXX_DEBUG(MainLogger, "Read server: " << name);
             new_config.m_servers_list.insert(name);
         }
 
-        const auto& pools_list = tree["pools_list"];
+        const auto& pools_list = tree[CONFIG_KEY_POOLS_LIST];
         for (auto i = pools_list.begin(); i != pools_list.end(); ++i) {
             const auto& pool_name = i.name();
             const auto& data = *i;
 
-            if (!data.isMember("worker_count") || !data.isMember("jobs_list")) {
-                LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") is missing one or more key in pools_list (worker_count, jobs_list)");
-                throw std::runtime_error("jobs_list config parse failure");
+            if (!data.isMember(CONFIG_KEY_POOL_WORKER_COUNT) || !data.isMember(CONFIG_KEY_POOL_JOBS_LIST) ||
+                !data[CONFIG_KEY_POOL_WORKER_COUNT].isUInt() || !data[CONFIG_KEY_POOL_JOBS_LIST].isArray()) {
+                LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") has invalid " << CONFIG_KEY_POOLS_LIST <<
+                                          " elements: (" << CONFIG_KEY_POOL_WORKER_COUNT << ", " <<
+                                          CONFIG_KEY_POOL_JOBS_LIST << ")");
+                throw std::runtime_error("config jobs list parse failure");
             }
 
-            uint32_t count = data["worker_count"].asUInt();
+            uint32_t count = data[CONFIG_KEY_POOL_WORKER_COUNT].asUInt();
             LOG4CXX_DEBUG(MainLogger, "Read pool: " << pool_name << " with count " << count);
 
-            const auto& jobs_list = data["jobs_list"];
+            const auto& jobs_list = data[CONFIG_KEY_POOL_JOBS_LIST];
             auto& pooldata = new_config.m_pool_map[pool_name];
             pooldata.first = count;
 
             for (auto j = jobs_list.begin(); j != jobs_list.end(); ++j) {
-                LOG4CXX_DEBUG(MainLogger, "Pool " << pool_name << " adding job " << j->asString());
-                pooldata.second.insert(j->asString());
+                if (!j->isString()) {
+                    LOG4CXX_ERROR(MainLogger, CONFIG_KEY_POOL_JOBS_LIST << " does not contain strings");
+                }
+
+                const auto& name = j->asString();
+                LOG4CXX_DEBUG(MainLogger, "Pool " << pool_name << " adding job " << name);
+                pooldata.second.insert(name);
             }
         }
 
