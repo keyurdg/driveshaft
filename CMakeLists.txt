@@ -13,8 +13,8 @@ SET(PACKAGE_BUGREPORT "https://github.com/keyurdg/driveshaft/issues")
 PROJECT(${PACKAGE_NAME} C CXX ASM)
 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release")
-    message(STATUS "Build type not specified: cmake build type Release.")
+    set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+    message(STATUS "Build type not specified: cmake build type RelWithDebInfo.")
 endif()
 
 include(Compiler)
