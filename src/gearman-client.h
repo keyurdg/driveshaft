@@ -4,6 +4,7 @@
 #include <memory>
 #include <libgearman-1.0/gearman.h>
 #include "common-defs.h"
+#include "dist/json/json.h"
 
 namespace Driveshaft {
 
@@ -29,6 +30,7 @@ private:
 
     const std::string& m_http_uri;
     std::unique_ptr<gearman_worker_st, decltype(&gearman_client_deleter)> m_worker_ptr;
+    std::unique_ptr<Json::CharReader> m_json_parser;
     enum class State {
         INIT,
         GRAB_JOB,

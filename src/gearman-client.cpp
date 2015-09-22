@@ -68,6 +68,7 @@ void gearman_client_deleter(gearman_worker_st *ptr) noexcept {
 GearmanClient::GearmanClient(const StringSet& server_list, int64_t timeout, const StringSet& jobs_list, const std::string& uri)
                              : m_http_uri(uri)
                              , m_worker_ptr(gearman_worker_create(nullptr), gearman_client_deleter)
+                             , m_json_parser(nullptr)
                              , m_state(State::INIT) {
     LOG4CXX_DEBUG(ThreadLogger, "Starting GearmanClient");
     if (m_worker_ptr.get() == nullptr) {
@@ -88,6 +89,10 @@ GearmanClient::GearmanClient(const StringSet& server_list, int64_t timeout, cons
             throw GearmanClientException("Unable to add job: " + job, true);
         }
     }
+
+    Json::CharReaderBuilder jsonfactory;
+    jsonfactory.strictMode(&jsonfactory.settings_);
+    m_json_parser.reset(jsonfactory.newCharReader());
 
     m_state = State::GRAB_JOB;
 }
@@ -219,28 +224,29 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
 
     /* Parse the response */
     {
-        try {
-            Json::Value tree;
-            raw_resp >> tree;
+        Json::Value tree;
+        const std::string& raw_resp_str = raw_resp.str();
+        const char *resp_begin = raw_resp_str.data();
+        const char *resp_end = resp_begin + raw_resp_str.length();
+        std::string parse_errors;
 
-            if (!tree.isMember("gearman_ret") || !tree.isMember("response_string")) {
-                LOG4CXX_ERROR(ThreadLogger, "Malformed response from worker: " << raw_resp.str());
-                goto error;
-            }
-            // the Json interface needs a default, so here goes...
-            gearman_ret = (gearman_return_t)(tree.get("gearman_ret", GEARMAN_SUCCESS).asInt());
-            return_string.append(tree.get("response_string", "").asString());
-
-            LOG4CXX_INFO(ThreadLogger, "Finished job: function=" << job_function_name << " handle=" << job_handle << " unique=" << job_unique
-                                       << " workload=" << job_workload
-                                       << " return_code=" << gearman_ret << " response_string=" << return_string);
-        } catch (std::exception& e) {
-            LOG4CXX_ERROR(ThreadLogger, "Caught exception trying to parse response: " << e.what());
-            goto error;
-        } catch (...) {
-            LOG4CXX_ERROR(ThreadLogger, "Unable to parse response due to unexpected exception");
+        if (!m_json_parser->parse(resp_begin, resp_end, &tree, &parse_errors)) {
+            LOG4CXX_ERROR(ThreadLogger, "Failed to parse response. Raw response: " << raw_resp << " Errors: " << parse_errors);
             goto error;
         }
+
+        if (!tree.isMember("gearman_ret") || !tree.isMember("response_string")) {
+            LOG4CXX_ERROR(ThreadLogger, "Malformed response from worker. Missing one or more key elements (gearman_ret, response_string): " << raw_resp.str());
+            goto error;
+        }
+
+        // the Json interface needs a default, so here goes...
+        gearman_ret = (gearman_return_t)(tree["gearman_ret"].asInt());
+        return_string.append(tree["response_string"].asString());
+
+        LOG4CXX_INFO(ThreadLogger, "Finished job: function=" << job_function_name << " handle=" << job_handle << " unique=" << job_unique
+                                   << " workload=" << job_workload
+                                   << " return_code=" << gearman_ret << " response_string=" << return_string);
 
         goto cleanup;
     }
