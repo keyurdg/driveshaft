@@ -23,7 +23,7 @@ $ sudo make install
 ```
 
 # Configuration
-gearshift takes two arguments:
+driveshaft takes two arguments:
 ```
 $ driveshaft
 Allowed options:
