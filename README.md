@@ -106,7 +106,7 @@ return SUCCESS/FAILURE along with any response text. The thread that is
 processing the job blocks waiting for a response.
 
 By reusing connections and not re-registering with gearmand on every job completion,
-Driveshaft saves GearmanD a lot of work that impacts enqueue latency.
+Driveshaft saves gearmand a lot of work that impacts enqueue latency.
 
 And by using an HTTP endpoint to actually do the heavy lifting, we get the
 benefits of a clean-sandbox and Opcache (and can even use HHVM!).
