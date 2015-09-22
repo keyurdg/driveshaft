@@ -49,10 +49,8 @@ static ShutdownType shutdown_type = ShutdownType::NO;
 
 static void shutdown_handler(int signal_arg) {
     if (signal_arg == SIGUSR1) {
-        LOG4CXX_INFO(MainLogger, "Shutting down gracefully...");
         shutdown_type = ShutdownType::GRACEFUL;
     } else {
-        LOG4CXX_INFO(MainLogger, "Shutting down hard...");
         shutdown_type = ShutdownType::HARD;
     }
 }
@@ -81,9 +79,11 @@ void MainLoop::run() {
     while(true) {
         switch (shutdown_type) {
         case ShutdownType::GRACEFUL:
+            LOG4CXX_INFO(MainLogger, "Shutting down gracefully...");
             return doShutdown(GRACEFUL_SHUTDOWN_WAIT);
 
         case ShutdownType::HARD:
+            LOG4CXX_INFO(MainLogger, "Shutting down hard...");
             return doShutdown(HARD_SHUTDOWN_WAIT);
 
         case ShutdownType::NO:
