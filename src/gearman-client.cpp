@@ -99,7 +99,8 @@ GearmanClient::GearmanClient(const StringSet& server_list, int64_t timeout, cons
 
 gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string& return_string) noexcept {
     CURL *curl;
-    CURLcode res;
+    CURLcode curlrc;
+    CURLFORMcode formerror;
     struct curl_httppost *formpost = nullptr;
     struct curl_httppost *lastptr = nullptr;
     struct curl_slist *headerlist = nullptr;
@@ -184,7 +185,6 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     LOG4CXX_INFO(ThreadLogger, "Starting job: function=" << job_function_name << " handle=" << job_handle << " unique=" << job_unique
                                << " workload=" << job_workload);
 
-    CURLFORMcode formerror;
     if ((formerror = curl_formadd(&formpost, &lastptr, CURLFORM_PTRNAME, "function_name", CURLFORM_PTRCONTENTS, job_function_name, CURLFORM_END)) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to add function_name to post: " << formerror);
         goto error;
@@ -208,9 +208,9 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         goto error;
     }
     /* Do it! */
-    res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-        LOG4CXX_ERROR(ThreadLogger, "Failed to perform curl. Error: " << curl_easy_strerror(res) << " Message: " << error_buf);
+    curlrc = curl_easy_perform(curl);
+    if (curlrc != CURLE_OK) {
+        LOG4CXX_ERROR(ThreadLogger, "Failed to perform curl. Error: " << curl_easy_strerror(curlrc) << " Message: " << error_buf);
         goto error;
     } else {
         /* check HTTP response code */

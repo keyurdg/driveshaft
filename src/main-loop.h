@@ -12,13 +12,17 @@
 namespace Driveshaft {
 
 /* count-of-workers -> [job names] */
-typedef std::pair<uint32_t, StringSet> PoolData;
+typedef struct {
+    uint32_t worker_count;
+    std::string job_processing_uri;
+    StringSet jobs_list;
+} PoolData;
+
 typedef std::map<std::string, PoolData> PoolMap;
 
 struct DriveshaftConfig {
     StringSet m_servers_list;
     int64_t m_timeout;
-    std::string m_http_uri;
     PoolMap m_pool_map;
     time_t m_load_time;
 

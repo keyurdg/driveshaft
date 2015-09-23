@@ -36,7 +36,6 @@ Allowed options:
 A simple jobsconfig file looks like this:
 ```json
 {
-    "http_uri": "http://localhost/job.php",
     "gearman_server_timeout": 5000,
     "gearman_servers_list":
     [
@@ -46,6 +45,7 @@ A simple jobsconfig file looks like this:
     {
         "ShopStats":
         {
+            "job_processing_uri": "http://localhost/job.php",
             "worker_count": 0,
             "jobs_list":
             [
@@ -54,6 +54,7 @@ A simple jobsconfig file looks like this:
         },
         "Newsfeed":
         {
+            "job_processing_uri": "http://localhost/job.php",
             "worker_count": 0,
             "jobs_list":
             [
@@ -62,6 +63,7 @@ A simple jobsconfig file looks like this:
         },
         "Regular":
         {
+            "job_processing_uri": "http://localhost/job.php",
             "worker_count": 0,
             "jobs_list":
             [
@@ -75,13 +77,13 @@ A simple jobsconfig file looks like this:
 ```
 
 ### Jobs Config Options
-* `http_uri` - the uri to send the job payload to for execution
 * `gearman_server_timeout` - timeout in milliseconds to wait for a job from gearmand.
 After this timeout the thread checks if it should exit, if not it tries gearmand again.
 * `gearman_servers_list` - addresses of gearmand servers
 * `pools list` - a list of named pools and corresponding configuration for every pool:
     * `worker_count` - Number of workers to reserve for jobs in this pool
     * `jobs_list` - Names of jobs that should be ran on the workers in this pool
+    * `job_processing_uri` - the uri to send the job payload to for execution
 
 ## logconfig
 An [example log config is
@@ -100,7 +102,7 @@ currently running job on that thread has a 24 hour window to finish, otherwise
 the job is considered failed, gearmand is updated and the thread is closed. Note
 that the job may keep on running on the HTTP endpoint. New pool threads are
 created as needed to match the configuration.
-4. Jobs are run via the HTTP endpoint `http_uri` defined in the config. The endpoint
+4. Jobs are run via the HTTP endpoint `job_processing_uri` defined in the config. The endpoint
 will receive the class name and all the args and will have to do the right thing and
 return SUCCESS/FAILURE along with any response text. The thread that is
 processing the job blocks waiting for a response.

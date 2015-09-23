@@ -62,7 +62,7 @@ static const uint32_t GRACEFUL_SHUTDOWN_WAIT = 30; //seconds
 
 void MainLoop::doShutdown(uint32_t wait) noexcept {
     for (auto& i : m_config.m_pool_map) {
-        i.second.first = 0;
+        i.second.worker_count = 0;
         modifyPool(i.first);
     }
 
@@ -70,12 +70,6 @@ void MainLoop::doShutdown(uint32_t wait) noexcept {
 }
 
 void MainLoop::run() {
-    auto operate = [this](const StringSet &list) {
-        for (auto const& i : list) {
-            modifyPool(i);
-        }
-    };
-
     while(true) {
         switch (shutdown_type) {
         case ShutdownType::GRACEFUL:
@@ -99,7 +93,7 @@ void MainLoop::run() {
             for (auto const& i : pools_to_shut) {
                 auto pooldata = m_config.m_pool_map.find(i);
                 if (pooldata != m_config.m_pool_map.end()) {
-                    pooldata->second.first = 0;
+                    pooldata->second.worker_count = 0;
                     modifyPool(i);
                 }
             }
@@ -111,10 +105,9 @@ void MainLoop::run() {
         }
 
         // Check the number of workers actually running matches the config
-        StringSet current_pool_names;
-        boost::copy(m_config.m_pool_map | boost::adaptors::map_keys,
-                    std::inserter(current_pool_names, current_pool_names.begin()));
-        operate(current_pool_names);
+        for (auto const& i : m_config.m_pool_map) {
+            modifyPool(i.first);
+        }
 
         std::this_thread::sleep_for(std::chrono::seconds(LOOP_SLEEP_DURATION));
     }
@@ -173,12 +166,12 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
     const auto& pooldata = iter->second;
     uint32_t running_count = m_thread_registry->poolCount(name);
 
-    if (running_count > pooldata.first) {
-        LOG4CXX_INFO(MainLogger, "Currently running: " << running_count << ". Decrease to: " << pooldata.first);
-        m_thread_registry->sendShutdown(name, running_count - pooldata.first);
-    } else if (running_count < pooldata.first) {
-        LOG4CXX_INFO(MainLogger, "Currently running: " << running_count << ". Increase to: " << pooldata.first);
-        for (uint32_t i = (pooldata.first - running_count); i > 0; i--) {
+    if (running_count > pooldata.worker_count) {
+        LOG4CXX_INFO(MainLogger, "Currently running: " << running_count << ". Decrease to: " << pooldata.worker_count);
+        m_thread_registry->sendShutdown(name, running_count - pooldata.worker_count);
+    } else if (running_count < pooldata.worker_count) {
+        LOG4CXX_INFO(MainLogger, "Currently running: " << running_count << ". Increase to: " << pooldata.worker_count);
+        for (uint32_t i = (pooldata.worker_count - running_count); i > 0; i--) {
             std::mutex mutex;
             std::condition_variable cv;
             bool thread_started = false;
@@ -191,8 +184,8 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
                           name,
                           m_config.m_servers_list,
                           m_config.m_timeout,
-                          pooldata.second,
-                          m_config.m_http_uri);
+                          pooldata.jobs_list,
+                          pooldata.job_processing_uri);
 
             std::unique_lock<std::mutex> lock(mutex);
             cv.wait(lock, [&thread_started]{return thread_started;});
@@ -203,10 +196,10 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
 
 static const char* CONFIG_KEY_GEARMAN_SERVER_TIMEOUT = "gearman_server_timeout";
 static const char* CONFIG_KEY_GEARMAN_SERVERS_LIST = "gearman_servers_list";
-static const char* CONFIG_KEY_HTTP_URI = "http_uri";
 static const char* CONFIG_KEY_POOLS_LIST = "pools_list";
 static const char* CONFIG_KEY_POOL_WORKER_COUNT = "worker_count";
 static const char* CONFIG_KEY_POOL_JOBS_LIST = "jobs_list";
+static const char* CONFIG_KEY_POOL_JOB_PROCESSING_URI = "job_processing_uri";
 
 bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
     struct stat sb;
@@ -241,16 +234,13 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
 
         if (!tree.isMember(CONFIG_KEY_GEARMAN_SERVER_TIMEOUT) ||
             !tree.isMember(CONFIG_KEY_GEARMAN_SERVERS_LIST) ||
-            !tree.isMember(CONFIG_KEY_HTTP_URI) ||
             !tree.isMember(CONFIG_KEY_POOLS_LIST) ||
             !tree[CONFIG_KEY_GEARMAN_SERVER_TIMEOUT].isUInt() ||
-            !tree[CONFIG_KEY_HTTP_URI].isString() ||
             !tree[CONFIG_KEY_GEARMAN_SERVERS_LIST].isArray() ||
             !tree[CONFIG_KEY_POOLS_LIST].isObject()) {
             LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") has one or more key malformed elements (" <<
                                       CONFIG_KEY_GEARMAN_SERVER_TIMEOUT << ", " <<
                                       CONFIG_KEY_GEARMAN_SERVERS_LIST << ", " <<
-                                      CONFIG_KEY_HTTP_URI << ", " <<
                                       CONFIG_KEY_POOLS_LIST << ")");
             throw std::runtime_error("config parse failure");
         }
@@ -261,10 +251,8 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
         new_config.m_pool_map.clear();
 
         new_config.m_timeout = tree[CONFIG_KEY_GEARMAN_SERVER_TIMEOUT].asUInt();
-        new_config.m_http_uri = tree[CONFIG_KEY_HTTP_URI].asString();
 
-        LOG4CXX_DEBUG(MainLogger, "New config: URI=" << new_config.m_http_uri <<
-                      " timeout=" << new_config.m_timeout);
+        LOG4CXX_DEBUG(MainLogger, "New config: timeout=" << new_config.m_timeout);
 
         const auto& servers_list = tree[CONFIG_KEY_GEARMAN_SERVERS_LIST];
         for (auto i = servers_list.begin(); i != servers_list.end(); ++i) {
@@ -283,20 +271,28 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
             const auto& pool_name = i.name();
             const auto& data = *i;
 
-            if (!data.isMember(CONFIG_KEY_POOL_WORKER_COUNT) || !data.isMember(CONFIG_KEY_POOL_JOBS_LIST) ||
-                !data[CONFIG_KEY_POOL_WORKER_COUNT].isUInt() || !data[CONFIG_KEY_POOL_JOBS_LIST].isArray()) {
+            if (!data.isMember(CONFIG_KEY_POOL_WORKER_COUNT) ||
+                !data.isMember(CONFIG_KEY_POOL_JOBS_LIST) ||
+                !data.isMember(CONFIG_KEY_POOL_JOB_PROCESSING_URI) ||
+                !data[CONFIG_KEY_POOL_JOB_PROCESSING_URI].isString() ||
+                !data[CONFIG_KEY_POOL_WORKER_COUNT].isUInt() ||
+                !data[CONFIG_KEY_POOL_JOBS_LIST].isArray()) {
                 LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") has invalid " << CONFIG_KEY_POOLS_LIST <<
-                                          " elements: (" << CONFIG_KEY_POOL_WORKER_COUNT << ", " <<
+                                          " elements: (" <<
+                                          CONFIG_KEY_POOL_WORKER_COUNT << ", " <<
+                                          CONFIG_KEY_POOL_JOB_PROCESSING_URI << ", " <<
                                           CONFIG_KEY_POOL_JOBS_LIST << ")");
                 throw std::runtime_error("config jobs list parse failure");
             }
 
-            uint32_t count = data[CONFIG_KEY_POOL_WORKER_COUNT].asUInt();
-            LOG4CXX_DEBUG(MainLogger, "Read pool: " << pool_name << " with count " << count);
+            auto& pooldata = new_config.m_pool_map[pool_name];
+            pooldata.worker_count = data[CONFIG_KEY_POOL_WORKER_COUNT].asUInt();
+            pooldata.job_processing_uri = data[CONFIG_KEY_POOL_JOB_PROCESSING_URI].asString();
+
+            LOG4CXX_DEBUG(MainLogger, "Read pool: " << pool_name << " with count " << pooldata.worker_count
+                                      << " and URI " << pooldata.job_processing_uri);
 
             const auto& jobs_list = data[CONFIG_KEY_POOL_JOBS_LIST];
-            auto& pooldata = new_config.m_pool_map[pool_name];
-            pooldata.first = count;
 
             for (auto j = jobs_list.begin(); j != jobs_list.end(); ++j) {
                 if (!j->isString()) {
@@ -305,7 +301,7 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
 
                 const auto& name = j->asString();
                 LOG4CXX_DEBUG(MainLogger, "Pool " << pool_name << " adding job " << name);
-                pooldata.second.insert(name);
+                pooldata.jobs_list.insert(name);
             }
         }
 
@@ -324,8 +320,7 @@ std::pair<StringSet, StringSet> DriveshaftConfig::compare(const DriveshaftConfig
     boost::copy(new_config.m_pool_map | boost::adaptors::map_keys,
                 std::inserter(latest_pool_names, latest_pool_names.begin()));
 
-    if ((m_http_uri != new_config.m_http_uri) ||
-        (m_servers_list != new_config.m_servers_list) ||
+    if ((m_servers_list != new_config.m_servers_list) ||
         (m_timeout != new_config.m_timeout)) {
         // Everything needs restarting
         return std::pair<StringSet, StringSet>(std::move(current_pool_names),
@@ -343,18 +338,27 @@ std::pair<StringSet, StringSet> DriveshaftConfig::compare(const DriveshaftConfig
                             current_pool_names.begin(), current_pool_names.end(),
                             std::inserter(pools_turn_on, pools_turn_on.begin()));
 
-        // Check for changed jobs
+        // Check for changed jobs or processing URI
         for (const auto& i : m_pool_map) {
             auto found = new_config.m_pool_map.find(i.first);
             if (found != new_config.m_pool_map.end()) {
-                const auto& lhs_jobs_set = i.second.second;
-                const auto& rhs_jobs_set = found->second.second;
-                StringSet diff;
-                std::set_symmetric_difference(lhs_jobs_set.begin(), lhs_jobs_set.end(),
-                                              rhs_jobs_set.begin(), rhs_jobs_set.end(),
-                                              std::inserter(diff, diff.begin()));
+                bool should_restart = false;
+                if (found->second.job_processing_uri != i.second.job_processing_uri) {
+                    should_restart = true;
+                } else {
+                    const auto& lhs_jobs_set = i.second.jobs_list;
+                    const auto& rhs_jobs_set = found->second.jobs_list;
+                    StringSet diff;
+                    std::set_symmetric_difference(lhs_jobs_set.begin(), lhs_jobs_set.end(),
+                                                  rhs_jobs_set.begin(), rhs_jobs_set.end(),
+                                                  std::inserter(diff, diff.begin()));
 
-                if (diff.size()) {
+                    if (diff.size()) {
+                        should_restart = true;
+                    }
+                }
+
+                if (should_restart) {
                     pools_turn_off.insert(i.first);
                     pools_turn_on.insert(i.first);
                 }
