@@ -1,6 +1,7 @@
 #ifndef incl_DRIVESHAFT_GEARMAN_CLIENT_H_
 #define incl_DRIVESHAFT_GEARMAN_CLIENT_H_
 
+#include <exception>
 #include <memory>
 #include <libgearman-1.0/gearman.h>
 #include "common-defs.h"
@@ -26,8 +27,6 @@ private:
     GearmanClient& operator=(const GearmanClient&) = delete;
     GearmanClient& operator=(const GearmanClient&&) = delete;
 
-    void gearmanClientDeleter(gearman_worker_st* ptr);
-
     const std::string& m_http_uri;
     std::unique_ptr<gearman_worker_st, decltype(&gearman_client_deleter)> m_worker_ptr;
     std::unique_ptr<Json::CharReader> m_json_parser;
@@ -41,14 +40,17 @@ private:
 class GearmanClientException : public std::exception {
 
 public:
-    GearmanClientException(const std::string& msg, bool retriable) : m_msg(msg), m_retriable(retriable) {}
-    ~GearmanClientException() throw() {}
+    GearmanClientException(const std::string& msg, bool retriable) noexcept
+    : std::exception()
+    , m_msg(msg)
+    , m_retriable(retriable) {}
+    virtual ~GearmanClientException() noexcept {}
 
-    const char* what() const throw() {
+    const char* what() const noexcept override {
         return m_msg.c_str();
     }
 
-    bool retriable() const {
+    bool retriable() const noexcept {
         return m_retriable;
     }
 

@@ -26,6 +26,7 @@ static void* worker_callback(gearman_job_st *job, void *context,
     return ret;
 }
 
+/* return of 0 means the write failed and curl will abort the transfer */
 static size_t curl_write_callback(char *ptr, size_t size, size_t nmemb, void *userdata) noexcept {
     LOG4CXX_DEBUG(ThreadLogger, "Starting curl write callback");
     std::stringstream *write_to = (std::stringstream *) userdata;
@@ -40,6 +41,7 @@ static size_t curl_write_callback(char *ptr, size_t size, size_t nmemb, void *us
 }
 
 static const uint64_t MAX_JOB_RUNNING_TIME = 86400; // seconds
+/* return of 1 means failure and curl will abort the transfer */
 static int curl_progress_callback(void *p, double dltotal, double dlnow,
                                   double ultotal, double ulnow) noexcept {
     LOG4CXX_DEBUG(ThreadLogger, "Starting curl progress callback");

@@ -3,7 +3,6 @@
 
 #include <string>
 #include <set>
-#include <memory>
 #include <atomic>
 #include <log4cxx/logger.h>
 
