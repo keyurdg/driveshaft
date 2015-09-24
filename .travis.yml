@@ -17,5 +17,4 @@ addons:
     - clang
     - libgearman-dev
     - liblog4cxx10-dev
-    - libboost1.48-all-dev
-
+    - libboost-all-dev

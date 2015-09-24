@@ -1,5 +1,5 @@
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost 1.48.0 REQUIRED COMPONENTS system program_options)
+find_package(Boost 1.46.0 REQUIRED COMPONENTS system program_options)
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 LIST(APPEND DRIVESHAFT_LINK_LIBRARIES ${Boost_LIBRARIES})
