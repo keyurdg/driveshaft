@@ -1,5 +1,7 @@
 # Driveshaft - Gearman Worker Manager
 
+[![Build Status](https://travis-ci.org/keyurdg/driveshaft.svg?branch=master)](https://travis-ci.org/keyurdg/driveshaft)
+
 # Getting Started
 
 # Install
