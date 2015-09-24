@@ -2,7 +2,7 @@ language: cpp
 compiler:
 - gcc
 - clang
-script: cmake . && make test
+script: cmake . && make driveshaft_unit_tests && make test
 install:
 - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
 sudo: false
