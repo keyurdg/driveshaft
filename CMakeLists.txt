@@ -28,14 +28,14 @@ MARK_AS_ADVANCED(CLEAR CMAKE_INSTALL_PREFIX)
 
 INCLUDE(CheckFunctionExists)
 
+ADD_SUBDIRECTORY(tests/unit/gtest-1.7.0)
 ADD_SUBDIRECTORY(src)
+INCLUDE_DIRECTORIES(tests/unit/gtest-1.7.0/include ${COMMON_INCLUDES})
 
 # use GNU install dirs (e.g. lib64 instead of lib)
 INCLUDE(GNUInstallDirs)
 
 enable_testing()
-find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIRS})
 add_executable(driveshaft_unit_tests tests/unit/tests.cpp)
-target_link_libraries(driveshaft_unit_tests ${GTEST_BOTH_LIBRARIES})
+target_link_libraries(driveshaft_unit_tests gtest)
 add_test(AllTestsInDriveShaft driveshaft_unit_tests)

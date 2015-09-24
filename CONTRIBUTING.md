@@ -9,5 +9,5 @@
 
 ## How to run tests
 ```
-cmake . && make test
+cmake . && make driveshaft_unit_tests && make test
 ```
