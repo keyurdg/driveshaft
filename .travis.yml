@@ -8,6 +8,6 @@ install:
 - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
 sudo: required
 before_install:
-- sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+- sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 - sudo apt-get update -qq
 - sudo apt-get install -qq build-essential gcc-4.8 g++-4.8 clang libgearman-dev liblog4cxx10-dev libboost-all-dev gearman-job-server php5-gearman libcurl4-openssl-dev
