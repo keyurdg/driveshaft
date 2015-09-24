@@ -1,7 +1,9 @@
 language: cpp
 compiler:
 - gcc
-script: cmake . && make driveshaft_unit_tests && make test
+script:
+- cmake . && make driveshaft_unit_tests && make test
+- make driveshaft && ./tests/integration.sh
 install:
 - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
 sudo: false
@@ -17,3 +19,5 @@ addons:
     - libgearman-dev
     - liblog4cxx10-dev
     - libboost-all-dev
+    - gearman-job-server
+    - php5-gearman
