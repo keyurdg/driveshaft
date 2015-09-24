@@ -21,3 +21,4 @@ addons:
     - libboost-all-dev
     - gearman-job-server
     - php5-gearman
+    - libcurl4-openssl-dev
