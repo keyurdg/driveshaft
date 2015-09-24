@@ -1,18 +1,29 @@
 #!/bin/bash
 
+# This is an end-to-end test of driveshaft, gearmand, and the gearman extension
+# for PHP. It implements a simple 'EchoWorkload' job which echoes back whatever
+# workload it receives.
+#
+# The script starts gearmand, driveshaft, and a web server (php -S) which hosts
+# the EchoWorkload code. A job is queued via GearmanClient in PHP, and the
+# result data is verified to match the workload.
+#
+
 # Set vars from env or defaults
 pushd $(dirname $0) >/dev/null 2>&1
 this_dir=$(pwd)
 popd > /dev/null
-driveshaft_home=$(dirname $(dirname $this_dir))
+driveshaft_home=$(dirname $this_dir)
 gearmand_bin=${GEARMAND_BIN:-gearmand}
 driveshaft_bin=${DRIVESHAFT_BIN:-$driveshaft_home/src/driveshaft}
+gearmand_port=47301
+httpd_port=47302
 
 # Do sanity checks
 echo "Doing sanity checks..."
 die() { echo "$@" >&2 ; exit 1; }
-[ -f $gearmand_bin ] || die "$gearmand_bin is not a file; override with GEARMAND_BIN"
-[ -f $driveshaft_bin ] || die "$driveshaft_bin is not a file; override with DRIVESHAFT_BIN"
+which $gearmand_bin >/dev/null 2>&1 || die "$gearmand_bin is not in PATH; override with GEARMAND_BIN"
+which $driveshaft_bin >/dev/null 2>&1 || die "$driveshaft_bin is not in PATH; override with DRIVESHAFT_BIN"
 which nc >/dev/null 2>&1 || die "nc not in PATH"
 which php >/dev/null 2>&1 || die "php not in PATH"
 ( php -i | grep 'gearman.*enabled' ) >/dev/null 2>&1 || die "gearman php extension does not appear to be installed"
@@ -20,24 +31,24 @@ which php >/dev/null 2>&1 || die "php not in PATH"
 # Start gearmand
 echo "Starting gearmand..."
 gearmand_log=$(mktemp)
-$gearmand_bin --port 47301 --verbose INFO --log-file $gearmand_log &
+$gearmand_bin --port $gearmand_port --verbose INFO --log-file $gearmand_log &
 gearmand_pid=$!
 sleep 1
 
 # Write driveshaft config
 echo "Writing driveshaft config..."
-read -r -d '' driveshaft_config <<'EOD'
+read -r -d '' driveshaft_config <<EOD
 {
     "gearman_server_timeout": 1000,
     "gearman_servers_list": [
-        "localhost:47301"
+        "localhost:$gearmand_port"
     ],
     "pools_list": {
         "Regular": {
-            "job_processing_uri": "http://localhost:47302/",
+            "job_processing_uri": "http://localhost:$httpd_port/",
             "worker_count": 10,
             "jobs_list": [
-                "GetTime"
+                "EchoWorkload"
             ]
         }
     }
@@ -58,7 +69,7 @@ read -r -d '' work_script <<'EOD'
 <?php
 echo json_encode([
     'gearman_ret' => 0,
-    'response_string' => strval(time()),
+    'response_string' => unserialize($_POST['workload']),
 ]);
 EOD
 work_script_path=$(mktemp)
@@ -66,7 +77,7 @@ echo $work_script > $work_script_path
 
 # Start httpd
 echo "Starting httpd (php -S)..."
-php -S localhost:47302 $work_script_path &
+php -S localhost:$httpd_port $work_script_path &
 httpd_pid=$!
 sleep 1
 
@@ -74,25 +85,28 @@ sleep 1
 echo "Queuing job..."
 read -r -d '' php_script <<'EOD'
     $exit_code = 1;
+    $workload = 'hello42';
     $client = new GearmanClient();
-    $client->addServer('localhost', 47301);
-    $client->setCompleteCallback(function($task) use (&$exit_code) {
-        echo "setCompleteCallback: {$task->data()}\n";
-        $exit_code = 0;
+    $client->addServer('localhost', (int)$argv[1]);
+    $client->setCompleteCallback(function($task) use (&$exit_code, $workload) {
+        echo "CompleteCallback: {$task->data()}\n";
+        if ($workload === $task->data()) {
+            $exit_code = 0;
+        }
     });
-    if (!$client->addTask('GetTime', serialize(''))) {
+    if (!$client->addTask('EchoWorkload', serialize($workload))) {
         die("addTask failed\n");
     }
     $client->runTasks();
     exit($exit_code);
 EOD
-timeout 5 php -r "$php_script"
+timeout 5 php -r "$php_script" $gearmand_port
 exit_code=$?
 if [ $exit_code -eq 0 ]; then
     echo -e "\e[32mSuccess! :)\e[0m"
 else
-    echo -e "\e[31mFailed :(\e[0m"
     cat $gearmand_log
+    echo -e "\e[31mFailed :(\e[0m"
 fi
 
 # Cleanup
