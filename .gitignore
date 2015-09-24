@@ -5,3 +5,6 @@ cmake_install.cmake
 install_manifest.txt
 src/driveshaft
 runlog*
+driveshaft_unit_tests
+CTestTestfile.cmake
+Testing/
