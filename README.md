@@ -112,3 +112,6 @@ Driveshaft saves gearmand a lot of work that impacts enqueue latency.
 
 And by using an HTTP endpoint to actually do the heavy lifting, we get the
 benefits of a clean-sandbox and Opcache (and can even use HHVM!).
+
+# Contribute
+See the [Contributing Guide](https://github.com/keyurdg/driveshaft/blob/master/CONTRIBUTING.md)
