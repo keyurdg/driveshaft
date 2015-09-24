@@ -16,4 +16,6 @@ addons:
     - g++-4.8
     - clang
     - libgearman-dev
+    - liblog4cxx10-dev
+    - libboost-all-dev
 
