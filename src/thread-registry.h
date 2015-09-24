@@ -11,7 +11,18 @@
 
 namespace Driveshaft {
 
-typedef std::map<std::thread::id, bool> ThreadMap;
+/* This is duplicative. It can be better addressed as a single data
+ * structure using boost::multi_index. But that is hard to read. So
+ * for the time being I am prioritizing readability over efficiency.
+ * This may change in the future
+ */
+struct ThreadData {
+    std::string pool;
+    bool should_shutdown;
+    std::string state;
+};
+
+typedef std::map<std::thread::id, ThreadData> ThreadMap;
 typedef std::map<std::string, std::set<std::thread::id> > ThreadRegistryStore;
 
 class ThreadRegistry {
@@ -25,6 +36,8 @@ public:
     uint32_t poolCount(const std::string& pool) noexcept;
     bool sendShutdown(const std::string& pool, uint32_t count) noexcept;
     bool shouldShutdown(std::thread::id tid) noexcept;
+    void setThreadState(std::thread::id tid, const std::string& state) noexcept;
+    ThreadMap getThreadMap() noexcept;
 
 private:
     ThreadRegistry(const ThreadRegistry&) = delete;

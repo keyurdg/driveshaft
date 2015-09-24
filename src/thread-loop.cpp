@@ -34,7 +34,7 @@ void ThreadLoop::run(uint32_t attempts) noexcept {
     }
 
     try {
-        GearmanClient gearclient(m_server_list, m_timeout, m_jobs_list, m_http_uri);
+        GearmanClient gearclient(m_registry, m_server_list, m_timeout, m_jobs_list, m_http_uri);
 
         while (true) {
             // First check if we should shutdown

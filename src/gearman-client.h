@@ -5,6 +5,7 @@
 #include <memory>
 #include <libgearman-1.0/gearman.h>
 #include "common-defs.h"
+#include "thread-registry.h"
 #include "dist/json/json.h"
 
 namespace Driveshaft {
@@ -14,7 +15,7 @@ void gearman_client_deleter(gearman_worker_st *ptr) noexcept;
 class GearmanClient {
 
 public:
-    GearmanClient(const StringSet& server_list, int64_t timeout, const StringSet& jobs_list, const std::string& http_uri);
+    GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, int64_t timeout, const StringSet& jobs_list, const std::string& http_uri);
     ~GearmanClient() = default;
 
     void run();
@@ -27,6 +28,7 @@ private:
     GearmanClient& operator=(const GearmanClient&) = delete;
     GearmanClient& operator=(const GearmanClient&&) = delete;
 
+    ThreadRegistryPtr m_registry;
     const std::string& m_http_uri;
     std::unique_ptr<gearman_worker_st, decltype(&gearman_client_deleter)> m_worker_ptr;
     std::unique_ptr<Json::CharReader> m_json_parser;

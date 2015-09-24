@@ -1,6 +1,7 @@
 #include <curl/curl.h>
 #include <time.h>
 #include <string.h>
+#include <thread>
 #include "gearman-client.h"
 #include "dist/json/json.h"
 
@@ -67,8 +68,9 @@ void gearman_client_deleter(gearman_worker_st *ptr) noexcept {
     gearman_worker_free(ptr);
 }
 
-GearmanClient::GearmanClient(const StringSet& server_list, int64_t timeout, const StringSet& jobs_list, const std::string& uri)
-                             : m_http_uri(uri)
+GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, int64_t timeout, const StringSet& jobs_list, const std::string& uri)
+                             : m_registry(registry)
+                             , m_http_uri(uri)
                              , m_worker_ptr(gearman_worker_create(nullptr), gearman_client_deleter)
                              , m_json_parser(nullptr)
                              , m_state(State::INIT) {
@@ -97,6 +99,7 @@ GearmanClient::GearmanClient(const StringSet& server_list, int64_t timeout, cons
     m_json_parser.reset(jsonfactory.newCharReader());
 
     m_state = State::GRAB_JOB;
+    m_registry->setThreadState(std::this_thread::get_id(), std::string("Waiting for work"));
 }
 
 gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string& return_string) noexcept {
@@ -119,6 +122,8 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     // The blank Expect header is to solve the issue described here: http://devblog.songkick.com/2012/11/27/a-second-here-a-second-there/
     // The cURL documentation also recommends it in their examples: http://curl.haxx.se/libcurl/c/postit2.html
     static const char expect_buf[] = "Expect:";
+
+    m_registry->setThreadState(std::this_thread::get_id(), std::string().append("job_handle=").append(job_handle).append(" job_unique=").append(job_unique));
 
     curl = curl_easy_init();
     if (!curl) {
@@ -287,6 +292,7 @@ void GearmanClient::run() {
                 LOG4CXX_INFO(ThreadLogger, "Job failed with error " << ret);
                 /* fall through */
             case GEARMAN_SUCCESS:
+                m_registry->setThreadState(std::this_thread::get_id(), std::string("Waiting for work"));
                 return; // The caller should decide whether to get more jobs or do other things
 
             case GEARMAN_TIMEOUT:
