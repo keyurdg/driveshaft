@@ -4,7 +4,7 @@ namespace Driveshaft {
 
 #define DS_ASSERT(cond, logger)\
     do {\
-        if (!cond) {\
+        if (!(cond)) {\
             LOG4CXX_ERROR(logger, "Failed assertion: " << #cond);\
             throw std::runtime_error(#cond);\
         }\
