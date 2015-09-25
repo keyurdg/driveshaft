@@ -176,7 +176,7 @@ static void status_thread_delegate(ThreadRegistryPtr registry) {
 
         io_service.run();
     } catch (std::exception& e) {
-        LOG4CXX_ERROR(ThreadLogger, "Unable to create status loop due to error: " << e.what());
+        LOG4CXX_ERROR(StatusLogger, "Unable to create status loop due to error: " << e.what());
         return_status_functor(ThreadStartState::FAILURE);
     }
 }
