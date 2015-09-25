@@ -48,6 +48,7 @@ protected:
     ~MainLoop() = default;
 
 private:
+    void startStatusThread();
     bool setupSignals() const noexcept;
     void doShutdown(uint32_t wait) noexcept;
     void modifyPool(const std::string& name) noexcept;

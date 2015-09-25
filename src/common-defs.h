@@ -13,7 +13,9 @@ typedef std::set<std::string> StringSet;
 extern std::atomic_bool g_force_shutdown;
 extern log4cxx::LoggerPtr MainLogger;
 extern log4cxx::LoggerPtr ThreadLogger;
+extern log4cxx::LoggerPtr StatusLogger;
 
+extern uint32_t STATUS_PORT;
 extern uint32_t MAX_JOB_RUNNING_TIME; // Expressed in seconds
 
 extern uint32_t GEARMAND_RESPONSE_TIMEOUT; // This drives all the other timeouts below. Expressed in seconds

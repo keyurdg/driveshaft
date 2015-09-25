@@ -8,3 +8,4 @@ runlog*
 driveshaft_unit_tests
 CTestTestfile.cmake
 Testing/
+*.a

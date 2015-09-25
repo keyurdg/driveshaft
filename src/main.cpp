@@ -23,11 +23,14 @@ namespace Driveshaft {
 
 static const char* MAIN_LOGGER_NAME = "Main";
 static const char* THREAD_LOGGER_NAME = "Thread";
+static const char* STATUS_LOGGER_NAME = "Status";
 
 /* Define the externs from common-defs */
 std::atomic_bool g_force_shutdown;
 log4cxx::LoggerPtr MainLogger(log4cxx::Logger::getLogger(MAIN_LOGGER_NAME));
 log4cxx::LoggerPtr ThreadLogger(log4cxx::Logger::getLogger(THREAD_LOGGER_NAME));
+log4cxx::LoggerPtr StatusLogger(log4cxx::Logger::getLogger(STATUS_LOGGER_NAME));
+uint32_t STATUS_PORT;
 uint32_t MAX_JOB_RUNNING_TIME;
 uint32_t GEARMAND_RESPONSE_TIMEOUT; // This drives all the other timeouts below
 uint32_t LOOP_SLEEP_DURATION;
@@ -50,6 +53,7 @@ int main(int argc, char **argv) {
             ("logconfig", po::value<std::string>(&log_config_file), "log config file path")
             ("max_running_time", po::value<uint32_t>(&Driveshaft::MAX_JOB_RUNNING_TIME), "how long can a job run before it is considered failed (in seconds)")
             ("loop_timeout", po::value<uint32_t>(&Driveshaft::GEARMAND_RESPONSE_TIMEOUT), "how long to wait for a response from gearmand before restarting event-loop (in seconds)")
+            ("status_port", po::value<uint32_t>(&Driveshaft::STATUS_PORT), "port to listen on to return status")
     ;
 
     try {
@@ -61,6 +65,7 @@ int main(int argc, char **argv) {
             || !vm.count("jobsconfig")
             || !vm.count("logconfig")
             || !vm.count("max_running_time")
+            || !vm.count("status_port")
             || !vm.count("loop_timeout")) {
             std::cout << desc << std::endl;
             return 1;

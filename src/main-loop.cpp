@@ -7,6 +7,7 @@
 #include <fstream>
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/adaptors.hpp>
+#include <boost/asio.hpp>
 #include <exception>
 #include <utility>
 #include <mutex>
@@ -15,6 +16,7 @@
 #include "thread-registry.h"
 #include "main-loop.h"
 #include "thread-loop.h"
+#include "status-loop.h"
 
 namespace Driveshaft {
 
@@ -57,10 +59,13 @@ void MainLoop::doShutdown(uint32_t wait) noexcept {
         modifyPool(i.first);
     }
 
+    g_force_shutdown = true;
     std::this_thread::sleep_for(std::chrono::seconds(wait));
 }
 
 void MainLoop::run() {
+    startStatusThread();
+
     while(true) {
         switch (shutdown_type) {
         case ShutdownType::GRACEFUL:
@@ -129,20 +134,69 @@ bool MainLoop::setupSignals() const noexcept {
 
 static std::mutex s_new_thread_mutex;
 static std::condition_variable s_new_thread_cond;
-static bool s_new_thread_wakeup = false;
+static enum class ThreadStartState {
+    INIT,
+    SUCCESS,
+    FAILURE
+} s_new_thread_wakeup = ThreadStartState::INIT;
 
-static void thread_delegate(ThreadRegistryPtr registry,
+static void gearman_thread_delegate(ThreadRegistryPtr registry,
                             std::string pool,
                             StringSet servers_list,
                             StringSet jobs_list,
                             std::string http_uri) noexcept {
     std::unique_lock<std::mutex> lock(s_new_thread_mutex);
     ThreadLoop loop(registry, pool, servers_list, jobs_list, http_uri);
-    s_new_thread_wakeup = true;
+    s_new_thread_wakeup = ThreadStartState::SUCCESS;
     lock.unlock();
     s_new_thread_cond.notify_one();
 
     return loop.run(0);
+}
+
+static void status_thread_delegate(ThreadRegistryPtr registry) {
+    using boost::asio::ip::tcp;
+    using namespace boost::asio;
+
+    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
+
+    auto return_status_functor = [&lock](ThreadStartState status) {
+        s_new_thread_wakeup = status;
+        lock.unlock();
+        s_new_thread_cond.notify_one();
+    };
+
+    try {
+        io_service io_service;
+        StatusLoop loop(io_service, registry);
+
+        // this means we bound without issues
+        // return success to caller and don't use them anymore
+        return_status_functor(ThreadStartState::SUCCESS);
+
+        io_service.run();
+    } catch (std::exception& e) {
+        LOG4CXX_ERROR(ThreadLogger, "Unable to create status loop due to error: " << e.what());
+        return_status_functor(ThreadStartState::FAILURE);
+    }
+}
+
+void MainLoop::startStatusThread() {
+    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
+    s_new_thread_wakeup = ThreadStartState::INIT;
+
+    std::thread t(status_thread_delegate,
+                  m_thread_registry);
+
+    s_new_thread_cond.wait(lock, []{return s_new_thread_wakeup != ThreadStartState::INIT;});
+
+    if (s_new_thread_wakeup == ThreadStartState::SUCCESS) {
+        t.detach();
+    } else {
+        t.join();
+        throw std::runtime_error("cannot start status thread");
+    }
+
 }
 
 void MainLoop::modifyPool(const std::string& name) noexcept {
@@ -163,16 +217,16 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
         LOG4CXX_INFO(MainLogger, "Currently running: " << running_count << ". Increase to: " << pooldata.worker_count);
         for (uint32_t i = (pooldata.worker_count - running_count); i > 0; i--) {
             std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-            s_new_thread_wakeup = false;
+            s_new_thread_wakeup = ThreadStartState::INIT;
 
-            std::thread t(thread_delegate,
+            std::thread t(gearman_thread_delegate,
                           m_thread_registry,
                           name,
                           m_config.m_servers_list,
                           pooldata.jobs_list,
                           pooldata.job_processing_uri);
 
-            s_new_thread_cond.wait(lock, []{return s_new_thread_wakeup;});
+            s_new_thread_cond.wait(lock, []{return s_new_thread_wakeup != ThreadStartState::INIT;});
             t.detach();
         }
     }
