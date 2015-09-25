@@ -18,11 +18,6 @@
 
 namespace Driveshaft {
 
-MainLoop& MainLoop::getInstance(const std::string& config_file) noexcept {
-    static MainLoop singleton(config_file);
-    return singleton;
-}
-
 MainLoop::MainLoop(const std::string& config_file) noexcept
     : m_config_filename(config_file)
     , m_config()
@@ -136,22 +131,22 @@ bool MainLoop::setupSignals() const noexcept {
   return false;
 }
 
-static void thread_delegate(std::mutex& mutex,
-                            std::condition_variable& cv,
-                            bool& thread_started,
-                            ThreadRegistryPtr registry,
+static std::mutex s_new_thread_mutex;
+static std::condition_variable s_new_thread_cond;
+static bool s_new_thread_wakeup = false;
+
+static void thread_delegate(ThreadRegistryPtr registry,
                             std::string pool,
                             StringSet servers_list,
                             int64_t timeout,
                             StringSet jobs_list,
                             std::string http_uri) noexcept {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
     ThreadLoop loop(registry, pool, servers_list, timeout, jobs_list, http_uri);
-    thread_started = true;
+    s_new_thread_wakeup = true;
     lock.unlock();
-    cv.notify_one();
+    s_new_thread_cond.notify_one();
 
-    // mutex, cv and thread_started are not safe to use after the notify!
     return loop.run(0);
 }
 
@@ -172,14 +167,10 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
     } else if (running_count < pooldata.worker_count) {
         LOG4CXX_INFO(MainLogger, "Currently running: " << running_count << ". Increase to: " << pooldata.worker_count);
         for (uint32_t i = (pooldata.worker_count - running_count); i > 0; i--) {
-            std::mutex mutex;
-            std::condition_variable cv;
-            bool thread_started = false;
+            std::unique_lock<std::mutex> lock(s_new_thread_mutex);
+            s_new_thread_wakeup = false;
 
             std::thread t(thread_delegate,
-                          std::ref(mutex),
-                          std::ref(cv),
-                          std::ref(thread_started),
                           m_thread_registry,
                           name,
                           m_config.m_servers_list,
@@ -187,8 +178,7 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
                           pooldata.jobs_list,
                           pooldata.job_processing_uri);
 
-            std::unique_lock<std::mutex> lock(mutex);
-            cv.wait(lock, [&thread_started]{return thread_started;});
+            s_new_thread_cond.wait(lock, []{return s_new_thread_wakeup;});
             t.detach();
         }
     }

@@ -79,7 +79,8 @@ int main(int argc, char **argv) {
     /* Enter main loop */
     rc = 0;
     try {
-        Driveshaft::MainLoop::getInstance(jobs_config_file).run();
+        Driveshaft::MainLoopImpl loop(jobs_config_file);
+        loop.run();
     } catch (std::exception& e) {
         std::cout << "MainLoop threw exception: " << e.what() << std::endl;
         rc = 1;
