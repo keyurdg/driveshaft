@@ -28,6 +28,11 @@ static const char* THREAD_LOGGER_NAME = "Thread";
 std::atomic_bool g_force_shutdown;
 log4cxx::LoggerPtr MainLogger(log4cxx::Logger::getLogger(MAIN_LOGGER_NAME));
 log4cxx::LoggerPtr ThreadLogger(log4cxx::Logger::getLogger(THREAD_LOGGER_NAME));
+uint32_t MAX_JOB_RUNNING_TIME;
+uint32_t GEARMAND_RESPONSE_TIMEOUT; // This drives all the other timeouts below
+uint32_t LOOP_SLEEP_DURATION;
+uint32_t HARD_SHUTDOWN_WAIT_DURATION;
+uint32_t GRACEFUL_SHUTDOWN_WAIT_DURATION;
 
 }
 
@@ -43,13 +48,20 @@ int main(int argc, char **argv) {
             ("help", "produce help message")
             ("jobsconfig", po::value<std::string>(&jobs_config_file), "jobs config file path")
             ("logconfig", po::value<std::string>(&log_config_file), "log config file path")
+            ("max_running_time", po::value<uint32_t>(&Driveshaft::MAX_JOB_RUNNING_TIME), "how long can a job run before it is considered failed (in seconds)")
+            ("loop_timeout", po::value<uint32_t>(&Driveshaft::GEARMAND_RESPONSE_TIMEOUT), "how long to wait for a response from gearmand before restarting event-loop (in seconds)")
     ;
 
     try {
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
         po::notify(vm);
-        if (vm.empty() || vm.count("help") || !vm.count("jobsconfig") || !vm.count("logconfig")) {
+        if (vm.empty()
+            || vm.count("help")
+            || !vm.count("jobsconfig")
+            || !vm.count("logconfig")
+            || !vm.count("max_running_time")
+            || !vm.count("loop_timeout")) {
             std::cout << desc << std::endl;
             return 1;
         }
@@ -58,6 +70,10 @@ int main(int argc, char **argv) {
         std::cout << desc << std::endl;
         return 1;
     }
+
+    Driveshaft::LOOP_SLEEP_DURATION = (uint32_t) (Driveshaft::GEARMAND_RESPONSE_TIMEOUT / 2);
+    Driveshaft::HARD_SHUTDOWN_WAIT_DURATION = Driveshaft::GEARMAND_RESPONSE_TIMEOUT * 2;
+    Driveshaft::GRACEFUL_SHUTDOWN_WAIT_DURATION = Driveshaft::HARD_SHUTDOWN_WAIT_DURATION * 2;
 
     /* Load log config */
     try {
@@ -79,6 +95,9 @@ int main(int argc, char **argv) {
     /* Enter main loop */
     rc = 0;
     try {
+        LOG4CXX_INFO(Driveshaft::MainLogger, "Starting up with gearmand response timeout=" << Driveshaft::GEARMAND_RESPONSE_TIMEOUT
+                                             << " and max running time=" << Driveshaft::MAX_JOB_RUNNING_TIME);
+
         Driveshaft::MainLoopImpl loop(jobs_config_file);
         loop.run();
     } catch (std::exception& e) {

@@ -34,7 +34,6 @@ typedef std::map<std::string, PoolData> PoolMap;
 
 struct DriveshaftConfig {
     StringSet m_servers_list;
-    int64_t m_timeout;
     PoolMap m_pool_map;
     time_t m_load_time;
 

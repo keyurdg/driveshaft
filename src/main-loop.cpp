@@ -51,10 +51,6 @@ static void shutdown_handler(int signal_arg) {
 }
 }
 
-static const uint32_t LOOP_SLEEP_DURATION = 2; // Seconds
-static const uint32_t HARD_SHUTDOWN_WAIT = 10; //seconds
-static const uint32_t GRACEFUL_SHUTDOWN_WAIT = 30; //seconds
-
 void MainLoop::doShutdown(uint32_t wait) noexcept {
     for (auto& i : m_config.m_pool_map) {
         i.second.worker_count = 0;
@@ -69,11 +65,11 @@ void MainLoop::run() {
         switch (shutdown_type) {
         case ShutdownType::GRACEFUL:
             LOG4CXX_INFO(MainLogger, "Shutting down gracefully...");
-            return doShutdown(GRACEFUL_SHUTDOWN_WAIT);
+            return doShutdown(GRACEFUL_SHUTDOWN_WAIT_DURATION);
 
         case ShutdownType::HARD:
             LOG4CXX_INFO(MainLogger, "Shutting down hard...");
-            return doShutdown(HARD_SHUTDOWN_WAIT);
+            return doShutdown(HARD_SHUTDOWN_WAIT_DURATION);
 
         case ShutdownType::NO:
             break;
@@ -138,11 +134,10 @@ static bool s_new_thread_wakeup = false;
 static void thread_delegate(ThreadRegistryPtr registry,
                             std::string pool,
                             StringSet servers_list,
-                            int64_t timeout,
                             StringSet jobs_list,
                             std::string http_uri) noexcept {
     std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-    ThreadLoop loop(registry, pool, servers_list, timeout, jobs_list, http_uri);
+    ThreadLoop loop(registry, pool, servers_list, jobs_list, http_uri);
     s_new_thread_wakeup = true;
     lock.unlock();
     s_new_thread_cond.notify_one();
@@ -174,7 +169,6 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
                           m_thread_registry,
                           name,
                           m_config.m_servers_list,
-                          m_config.m_timeout,
                           pooldata.jobs_list,
                           pooldata.job_processing_uri);
 
@@ -184,7 +178,6 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
     }
 }
 
-static const char* CONFIG_KEY_GEARMAN_SERVER_TIMEOUT = "gearman_server_timeout";
 static const char* CONFIG_KEY_GEARMAN_SERVERS_LIST = "gearman_servers_list";
 static const char* CONFIG_KEY_POOLS_LIST = "pools_list";
 static const char* CONFIG_KEY_POOL_WORKER_COUNT = "worker_count";
@@ -222,14 +215,11 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
             throw std::runtime_error("config parse failure");
         }
 
-        if (!tree.isMember(CONFIG_KEY_GEARMAN_SERVER_TIMEOUT) ||
-            !tree.isMember(CONFIG_KEY_GEARMAN_SERVERS_LIST) ||
+        if (!tree.isMember(CONFIG_KEY_GEARMAN_SERVERS_LIST) ||
             !tree.isMember(CONFIG_KEY_POOLS_LIST) ||
-            !tree[CONFIG_KEY_GEARMAN_SERVER_TIMEOUT].isUInt() ||
             !tree[CONFIG_KEY_GEARMAN_SERVERS_LIST].isArray() ||
             !tree[CONFIG_KEY_POOLS_LIST].isObject()) {
             LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") has one or more key malformed elements (" <<
-                                      CONFIG_KEY_GEARMAN_SERVER_TIMEOUT << ", " <<
                                       CONFIG_KEY_GEARMAN_SERVERS_LIST << ", " <<
                                       CONFIG_KEY_POOLS_LIST << ")");
             throw std::runtime_error("config parse failure");
@@ -239,10 +229,6 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
 
         new_config.m_servers_list.clear();
         new_config.m_pool_map.clear();
-
-        new_config.m_timeout = tree[CONFIG_KEY_GEARMAN_SERVER_TIMEOUT].asUInt();
-
-        LOG4CXX_DEBUG(MainLogger, "New config: timeout=" << new_config.m_timeout);
 
         const auto& servers_list = tree[CONFIG_KEY_GEARMAN_SERVERS_LIST];
         for (auto i = servers_list.begin(); i != servers_list.end(); ++i) {
@@ -310,8 +296,7 @@ std::pair<StringSet, StringSet> DriveshaftConfig::compare(const DriveshaftConfig
     boost::copy(new_config.m_pool_map | boost::adaptors::map_keys,
                 std::inserter(latest_pool_names, latest_pool_names.begin()));
 
-    if ((m_servers_list != new_config.m_servers_list) ||
-        (m_timeout != new_config.m_timeout)) {
+    if (m_servers_list != new_config.m_servers_list) {
         // Everything needs restarting
         return std::pair<StringSet, StringSet>(std::move(current_pool_names),
                                                std::move(latest_pool_names));

@@ -15,7 +15,7 @@ void gearman_client_deleter(gearman_worker_st *ptr) noexcept;
 class GearmanClient {
 
 public:
-    GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, int64_t timeout, const StringSet& jobs_list, const std::string& http_uri);
+    GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, const StringSet& jobs_list, const std::string& http_uri);
     ~GearmanClient() = default;
 
     void run();
