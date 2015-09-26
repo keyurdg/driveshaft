@@ -1,7 +1,6 @@
 #ifndef incl_DRIVESHAFT_STATUS_LOOP_H_
 #define incl_DRIVESHAFT_STATUS_LOOP_H_
 
-#include <memory>
 #include <boost/asio.hpp>
 #include "thread-registry.h"
 
@@ -17,7 +16,7 @@ private:
     void startAccept() noexcept;
     void handleAccept(const boost::system::error_code&) noexcept;
     void setDeadline() noexcept;
-    void handleDeadline(const boost::system::error_code& error) noexcept;
+    void handleDeadline(const boost::system::error_code&) noexcept;
 
     StatusLoop() = delete;
     StatusLoop(const StatusLoop&) = delete;

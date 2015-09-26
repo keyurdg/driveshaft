@@ -4,13 +4,43 @@
 
 namespace Driveshaft {
 
+/*
+ * A quick primer on boost asio follow. It is all callbacks.
+ * m_acceptor sets up a listener on the port, or throws an exception if it cannot
+ * bind. The 'true' param at the end enables SO_REUSE.
+ *
+ * async_accept takes in a socket and a callback to call whenever accept
+ * succeeds. async_accept returns immediately and transfers control to
+ * io_service.run() in the calling context. This happens for all the following
+ * callbacks too.
+ *
+ * handleAccept is called when there's a new connection. m_socket is filled-in
+ * with the newest connection. Create a StatusResponder shared_ptr to handle
+ * the actual IO. This sets up a callback for async_read_until which looks for
+ * a "\n". If/when it finds one or EOF, it calls the callback to handleRead.
+ * Note how we're passing in self as the bound object instead of "this". This
+ * creates a copy of shared_ptr<StatusResponder> and hence keeps the object
+ * alive for the callback.
+ *
+ * handleRead gets the data off the wire and makes a response and calls
+ * async_write with a handleWrite callback. async_write will ensure the full
+ * buffer passed to it is written on the socket. It may make multiple calls
+ * to the handleWrite callback. On completing the full flush, the
+ * shared_ptr<StatusResponder> aka "self" reaches ref-count == 0 and is
+ * destructed.
+ */
+
 using namespace boost::asio;
 using boost::asio::ip::tcp;
 using namespace std::placeholders;
 
-static const char* STATUS_COMMAND_THREADS = "threads";
-static const char* STATUS_COMMAND_COUNTERS = "counters";
-static const char* STATUS_COMMAND_GAUGES = "gauges";
+static const std::string CR("\r");
+static const std::string STATUS_COMMAND_THREADS("threads");
+static const std::string STATUS_COMMAND_THREADS_CR(STATUS_COMMAND_THREADS + CR);
+// static const std::string STATUS_COMMAND_COUNTERS = "counters";
+// static const std::string STATUS_COMMAND_COUNTERS_CR(STATUS_COMMAND_COUNTERS + CR);
+// static const std::string STATUS_COMMAND_GAUGES("gauges");
+// static const std::string STATUS_COMMAND_GAUGES_CR(STATUS_COMMAND_GAUGES + CR);
 
 class StatusResponder : public std::enable_shared_from_this<StatusResponder> {
 private:
@@ -20,44 +50,48 @@ private:
     boost::asio::streambuf m_write_buf;
 
     void handleWrite(const boost::system::error_code& error, size_t bytes) noexcept {
-        if (error) {
-            LOG4CXX_ERROR(StatusLogger, "StatusResponder::handleWrite got an error: " << error);
-        } else {
-            LOG4CXX_DEBUG(StatusLogger, "Transmitted " << bytes << " status bytes ");
-        }
+        LOG4CXX_DEBUG(StatusLogger, "Transmitted " << bytes << " status bytes. Error: " << error);
     }
 
-    void handleRead(const boost::system::error_code& error, std::size_t size) {
+    void handleRead(const boost::system::error_code& error, std::size_t size) noexcept {
         if (error) {
-            LOG4CXX_ERROR(StatusLogger, "StatusResponder::handleRead got an error " << error);
+            // This is normal if for example the client goes away without sending a command
+            LOG4CXX_DEBUG(StatusLogger, "StatusResponder::handleRead got an error " << error);
         } else {
-            LOG4CXX_DEBUG(StatusLogger, "Read " << size << " bytes from socket");
-
             auto self(shared_from_this());
-            std::istream is(&m_read_buf);
+            std::ostream os(&m_write_buf);
             std::string input;
+
+            std::istream is(&m_read_buf);
             std::getline(is, input);
 
             LOG4CXX_DEBUG(StatusLogger, "Read string " << input << " from socket");
 
-            if (!input.compare(STATUS_COMMAND_THREADS)) {
+            if (!input.compare(STATUS_COMMAND_THREADS)
+                || !input.compare(STATUS_COMMAND_THREADS_CR)) {
                 LOG4CXX_DEBUG(StatusLogger, "Sending thread-map back");
 
                 const auto thread_map = m_registry->getThreadMap();
-                std::ostream stream(&m_write_buf);
 
                 for (const auto& i : thread_map) {
                     const auto &data = i.second;
-                    stream << i.first << "\t" << data.pool << "\t" << data.should_shutdown << "\t" << data.state << "\n";
+                    os << i.first << "\t" << data.pool << "\t" << data.should_shutdown << "\t" << data.state << "\r\n";
                 }
-
-                boost::asio::async_write(m_socket, m_write_buf, std::bind(&StatusResponder::handleWrite, self, _1, _2));
+            } else {
+                os << "Error: unrecognized command\r\n";
             }
+
+            boost::asio::async_write(m_socket, m_write_buf, std::bind(&StatusResponder::handleWrite, self, _1, _2));
         }
     }
 
-public:
-    StatusResponder(tcp::socket sock, ThreadRegistryPtr reg)
+    StatusResponder() = delete;
+    StatusResponder(const StatusResponder&) = delete;
+    StatusResponder(StatusResponder&&) = delete;
+    StatusResponder& operator=(const StatusResponder&) = delete;
+    StatusResponder& operator=(const StatusResponder&&) = delete;
+
+    StatusResponder(tcp::socket&& sock, ThreadRegistryPtr reg) noexcept
     : m_socket(std::move(sock))
     , m_registry(reg)
     , m_read_buf()
@@ -65,13 +99,26 @@ public:
         LOG4CXX_DEBUG(StatusLogger, "Started StatusResponder");
     }
 
-    void run() {
+public:
+    /*
+     * This class should only be constructed as a shared_ptr object so
+     * std::enable_shared_from_this() works. A raw new is wrong. Hence this
+     * static method to enforce this rule.
+     * At any place in this class, if you need a shared_ptr to "this" only
+     * use shared_from_this(). Don't wrap "this" in a shared_ptr by hand.
+     *
+     */
+    static std::shared_ptr<StatusResponder> makeNew(tcp::socket&& sock, ThreadRegistryPtr reg) noexcept {
+        return std::shared_ptr<StatusResponder>(new StatusResponder(std::move(sock), reg));
+    }
+
+    ~StatusResponder() = default;
+
+    void run() noexcept {
         auto self(shared_from_this());
         boost::asio::async_read_until(m_socket, m_read_buf, "\n",
                                       std::bind(&StatusResponder::handleRead, self, _1, _2));
     }
-
-
 };
 
 StatusLoop::StatusLoop(io_service& io_service, ThreadRegistryPtr reg)
@@ -119,10 +166,11 @@ void StatusLoop::startAccept() noexcept {
 
 void StatusLoop::handleAccept(const boost::system::error_code& error) noexcept {
     if (error) {
-        LOG4CXX_ERROR(StatusLogger, "StatusLoop::handleAccept got an error: " << error);
+        LOG4CXX_DEBUG(StatusLogger, "StatusLoop::handleAccept got an error: " << error);
     } else {
         LOG4CXX_DEBUG(StatusLogger, "Accepted status connection without error");
-        std::make_shared<StatusResponder>(std::move(m_socket), m_registry)->run();
+        auto responder = StatusResponder::makeNew(std::move(m_socket), m_registry);
+        responder->run();
     }
 
     startAccept();
