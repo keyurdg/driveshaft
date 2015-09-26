@@ -7,8 +7,6 @@
 
 namespace Driveshaft {
 
-typedef std::shared_ptr<boost::asio::ip::tcp::socket> tcp_socket_ptr;
-
 class StatusLoop {
 
 public:
@@ -17,8 +15,7 @@ public:
 
 private:
     void startAccept() noexcept;
-    void handleAccept(tcp_socket_ptr sock, const boost::system::error_code&) noexcept;
-    void handleWrite(tcp_socket_ptr sock, const boost::system::error_code& error, size_t bytes) noexcept;
+    void handleAccept(const boost::system::error_code&) noexcept;
     void setDeadline() noexcept;
     void handleDeadline(const boost::system::error_code& error) noexcept;
 
@@ -30,6 +27,7 @@ private:
 
     boost::asio::ip::tcp::acceptor m_acceptor;
     boost::asio::deadline_timer m_deadline_timer;
+    boost::asio::ip::tcp::socket m_socket;
     ThreadRegistryPtr m_registry;
 };
 
