@@ -102,7 +102,7 @@ shutdown wait durations (hard shutdown is 2x, and graceful is 4x this value).
 
 ## status port
 The server listens on `status_port` and currently supports the command `threads`.
-This returns back text formatted as "thread-id<Tab>pool-name<Tab>shutdown-flag<Tab>job_handle=XXX job_unique=YYY<CRLF>"
+This returns back text formatted as "<thread-id>\t<pool-name>\t<shutdown-flag>\t<job_handle=XXX job_unique=YYY>\r\n"
 for every running thread.
 
 # Design
