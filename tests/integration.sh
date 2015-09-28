@@ -59,7 +59,9 @@ echo $driveshaft_config > $driveshaft_config_path
 
 # Start driveshaft
 echo "Starting driveshaft..."
-$driveshaft_bin --jobsconfig $driveshaft_config_path --logconfig "$driveshaft_home/logconfig.xml" &
+$driveshaft_bin --jobsconfig $driveshaft_config_path \
+    --logconfig "$driveshaft_home/logconfig.xml" \
+    --max_running_time 3600 --loop_timeout 1 &
 driveshaft_pid=$!
 sleep 1
 
@@ -100,7 +102,7 @@ read -r -d '' php_script <<'EOD'
     $client->runTasks();
     exit($exit_code);
 EOD
-timeout 5 php -r "$php_script" $gearmand_port
+timeout 2 php -r "$php_script" $gearmand_port
 exit_code=$?
 if [ $exit_code -eq 0 ]; then
     echo -e "\e[32mSuccess! :)\e[0m"
