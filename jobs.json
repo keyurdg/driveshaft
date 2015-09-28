@@ -1,5 +1,4 @@
 {
-    "gearman_server_timeout": 5000,
     "gearman_servers_list":
     [
         "localhost"

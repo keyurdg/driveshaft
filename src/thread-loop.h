@@ -18,7 +18,6 @@ public:
     ThreadLoop(ThreadRegistryPtr registry,
                const std::string& pool,
                const StringSet& server_list,
-               int64_t timeout,
                const StringSet& jobs_list,
                const std::string& http_uri) noexcept;
     ~ThreadLoop() noexcept;
@@ -34,7 +33,6 @@ private:
     ThreadRegistryPtr m_registry;
     const std::string& m_pool;
     const StringSet& m_server_list;
-    int64_t m_timeout;
     const StringSet& m_jobs_list;
     const std::string& m_http_uri;
 };

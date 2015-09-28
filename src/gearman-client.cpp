@@ -41,7 +41,6 @@ static size_t curl_write_callback(char *ptr, size_t size, size_t nmemb, void *us
     return len;
 }
 
-static const uint64_t MAX_JOB_RUNNING_TIME = 86400; // seconds
 /* return of 1 means failure and curl will abort the transfer */
 static int curl_progress_callback(void *p, double dltotal, double dlnow,
                                   double ultotal, double ulnow) noexcept {
@@ -68,7 +67,7 @@ void gearman_client_deleter(gearman_worker_st *ptr) noexcept {
     gearman_worker_free(ptr);
 }
 
-GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, int64_t timeout, const StringSet& jobs_list, const std::string& uri)
+GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, const StringSet& jobs_list, const std::string& uri)
                              : m_registry(registry)
                              , m_http_uri(uri)
                              , m_worker_ptr(gearman_worker_create(nullptr), gearman_client_deleter)
@@ -80,7 +79,7 @@ GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server
     }
 
     gearman_worker_add_options(m_worker_ptr.get(), GEARMAN_WORKER_NON_BLOCKING);
-    gearman_worker_set_timeout(m_worker_ptr.get(), timeout);
+    gearman_worker_set_timeout(m_worker_ptr.get(), GEARMAND_RESPONSE_TIMEOUT * 1000);
 
     for (auto& server : server_list) {
         if (gearman_worker_add_servers(m_worker_ptr.get(), server.c_str()) != GEARMAN_SUCCESS) {

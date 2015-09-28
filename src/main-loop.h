@@ -9,6 +9,18 @@
 #include "common-defs.h"
 #include "thread-registry.h"
 
+/* forward declaration so we can friend it to MainLoopImpl below.
+ * The friend'ing ensures only main() can create objects of type
+ * MainLoopImpl. MainLoopImpl itself can only access the parent
+ * constructor and run method and none of the private methods that
+ * actually do the work.
+ *
+ * This whole charade so no users of this header can incorrectly
+ * create a stray MainLoop object and call run on it. MainLoop
+ * needs to be a singleton in this program.
+ */
+int main(int argc, char **argv);
+
 namespace Driveshaft {
 
 /* count-of-workers -> [job names] */
@@ -22,7 +34,6 @@ typedef std::map<std::string, PoolData> PoolMap;
 
 struct DriveshaftConfig {
     StringSet m_servers_list;
-    int64_t m_timeout;
     PoolMap m_pool_map;
     time_t m_load_time;
 
@@ -31,19 +42,18 @@ struct DriveshaftConfig {
 
 class MainLoop {
 
-public:
-    static MainLoop& getInstance(const std::string& config_file) noexcept;
+protected:
+    MainLoop(const std::string& config_file) noexcept;
     void run();
+    ~MainLoop() = default;
 
 private:
-    MainLoop(const std::string& config_file) noexcept;
+    void startStatusThread();
     bool setupSignals() const noexcept;
     void doShutdown(uint32_t wait) noexcept;
     void modifyPool(const std::string& name) noexcept;
     bool loadConfig(DriveshaftConfig& new_config);
     void checkRunningConfigAndRegistry() noexcept;
-
-    ~MainLoop() = default;
 
     MainLoop() = delete;
     MainLoop(const MainLoop&) = delete;
@@ -55,6 +65,14 @@ private:
     DriveshaftConfig m_config;
     ThreadRegistryPtr m_thread_registry;
     std::unique_ptr<Json::CharReader> m_json_parser;
+};
+
+class MainLoopImpl : private MainLoop {
+public:
+    friend int ::main(int argc, char **argv);
+
+private:
+    using MainLoop::MainLoop;
 };
 
 } // namespace Driveshaft

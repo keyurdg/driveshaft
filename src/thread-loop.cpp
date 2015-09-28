@@ -6,13 +6,11 @@ namespace Driveshaft {
 ThreadLoop::ThreadLoop(ThreadRegistryPtr registry,
                        const std::string& pool,
                        const StringSet& server_list,
-                       int64_t timeout,
                        const StringSet& jobs_list,
                        const std::string& http_uri) noexcept
                        : m_registry(registry)
                        , m_pool(pool)
                        , m_server_list(server_list)
-                       , m_timeout(timeout)
                        , m_jobs_list(jobs_list)
                        , m_http_uri(http_uri) {
     LOG4CXX_DEBUG(ThreadLogger, "Starting ThreadLoop for " << m_pool);
@@ -34,7 +32,7 @@ void ThreadLoop::run(uint32_t attempts) noexcept {
     }
 
     try {
-        GearmanClient gearclient(m_registry, m_server_list, m_timeout, m_jobs_list, m_http_uri);
+        GearmanClient gearclient(m_registry, m_server_list, m_jobs_list, m_http_uri);
 
         while (true) {
             // First check if we should shutdown

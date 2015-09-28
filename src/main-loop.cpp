@@ -7,6 +7,7 @@
 #include <fstream>
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/adaptors.hpp>
+#include <boost/asio.hpp>
 #include <exception>
 #include <utility>
 #include <mutex>
@@ -15,13 +16,9 @@
 #include "thread-registry.h"
 #include "main-loop.h"
 #include "thread-loop.h"
+#include "status-loop.h"
 
 namespace Driveshaft {
-
-MainLoop& MainLoop::getInstance(const std::string& config_file) noexcept {
-    static MainLoop singleton(config_file);
-    return singleton;
-}
 
 MainLoop::MainLoop(const std::string& config_file) noexcept
     : m_config_filename(config_file)
@@ -56,29 +53,28 @@ static void shutdown_handler(int signal_arg) {
 }
 }
 
-static const uint32_t LOOP_SLEEP_DURATION = 2; // Seconds
-static const uint32_t HARD_SHUTDOWN_WAIT = 10; //seconds
-static const uint32_t GRACEFUL_SHUTDOWN_WAIT = 30; //seconds
-
 void MainLoop::doShutdown(uint32_t wait) noexcept {
     for (auto& i : m_config.m_pool_map) {
         i.second.worker_count = 0;
         modifyPool(i.first);
     }
 
+    g_force_shutdown = true;
     std::this_thread::sleep_for(std::chrono::seconds(wait));
 }
 
 void MainLoop::run() {
+    startStatusThread();
+
     while(true) {
         switch (shutdown_type) {
         case ShutdownType::GRACEFUL:
             LOG4CXX_INFO(MainLogger, "Shutting down gracefully...");
-            return doShutdown(GRACEFUL_SHUTDOWN_WAIT);
+            return doShutdown(GRACEFUL_SHUTDOWN_WAIT_DURATION);
 
         case ShutdownType::HARD:
             LOG4CXX_INFO(MainLogger, "Shutting down hard...");
-            return doShutdown(HARD_SHUTDOWN_WAIT);
+            return doShutdown(HARD_SHUTDOWN_WAIT_DURATION);
 
         case ShutdownType::NO:
             break;
@@ -136,23 +132,71 @@ bool MainLoop::setupSignals() const noexcept {
   return false;
 }
 
-static void thread_delegate(std::mutex& mutex,
-                            std::condition_variable& cv,
-                            bool& thread_started,
-                            ThreadRegistryPtr registry,
+static std::mutex s_new_thread_mutex;
+static std::condition_variable s_new_thread_cond;
+static enum class ThreadStartState {
+    INIT,
+    SUCCESS,
+    FAILURE
+} s_new_thread_wakeup = ThreadStartState::INIT;
+
+static void gearman_thread_delegate(ThreadRegistryPtr registry,
                             std::string pool,
                             StringSet servers_list,
-                            int64_t timeout,
                             StringSet jobs_list,
                             std::string http_uri) noexcept {
-    std::unique_lock<std::mutex> lock(mutex);
-    ThreadLoop loop(registry, pool, servers_list, timeout, jobs_list, http_uri);
-    thread_started = true;
+    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
+    ThreadLoop loop(registry, pool, servers_list, jobs_list, http_uri);
+    s_new_thread_wakeup = ThreadStartState::SUCCESS;
     lock.unlock();
-    cv.notify_one();
+    s_new_thread_cond.notify_one();
 
-    // mutex, cv and thread_started are not safe to use after the notify!
     return loop.run(0);
+}
+
+static void status_thread_delegate(ThreadRegistryPtr registry) {
+    using boost::asio::ip::tcp;
+    using namespace boost::asio;
+
+    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
+
+    auto return_status_functor = [&lock](ThreadStartState status) {
+        s_new_thread_wakeup = status;
+        lock.unlock();
+        s_new_thread_cond.notify_one();
+    };
+
+    try {
+        io_service io_service;
+        StatusLoop loop(io_service, registry);
+
+        // this means we bound without issues
+        // return success to caller and don't use them anymore
+        return_status_functor(ThreadStartState::SUCCESS);
+
+        io_service.run();
+    } catch (std::exception& e) {
+        LOG4CXX_ERROR(StatusLogger, "Unable to create status loop due to error: " << e.what());
+        return_status_functor(ThreadStartState::FAILURE);
+    }
+}
+
+void MainLoop::startStatusThread() {
+    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
+    s_new_thread_wakeup = ThreadStartState::INIT;
+
+    std::thread t(status_thread_delegate,
+                  m_thread_registry);
+
+    s_new_thread_cond.wait(lock, []{return s_new_thread_wakeup != ThreadStartState::INIT;});
+
+    if (s_new_thread_wakeup == ThreadStartState::SUCCESS) {
+        t.detach();
+    } else {
+        t.join();
+        throw std::runtime_error("cannot start status thread");
+    }
+
 }
 
 void MainLoop::modifyPool(const std::string& name) noexcept {
@@ -172,29 +216,22 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
     } else if (running_count < pooldata.worker_count) {
         LOG4CXX_INFO(MainLogger, "Currently running: " << running_count << ". Increase to: " << pooldata.worker_count);
         for (uint32_t i = (pooldata.worker_count - running_count); i > 0; i--) {
-            std::mutex mutex;
-            std::condition_variable cv;
-            bool thread_started = false;
+            std::unique_lock<std::mutex> lock(s_new_thread_mutex);
+            s_new_thread_wakeup = ThreadStartState::INIT;
 
-            std::thread t(thread_delegate,
-                          std::ref(mutex),
-                          std::ref(cv),
-                          std::ref(thread_started),
+            std::thread t(gearman_thread_delegate,
                           m_thread_registry,
                           name,
                           m_config.m_servers_list,
-                          m_config.m_timeout,
                           pooldata.jobs_list,
                           pooldata.job_processing_uri);
 
-            std::unique_lock<std::mutex> lock(mutex);
-            cv.wait(lock, [&thread_started]{return thread_started;});
+            s_new_thread_cond.wait(lock, []{return s_new_thread_wakeup != ThreadStartState::INIT;});
             t.detach();
         }
     }
 }
 
-static const char* CONFIG_KEY_GEARMAN_SERVER_TIMEOUT = "gearman_server_timeout";
 static const char* CONFIG_KEY_GEARMAN_SERVERS_LIST = "gearman_servers_list";
 static const char* CONFIG_KEY_POOLS_LIST = "pools_list";
 static const char* CONFIG_KEY_POOL_WORKER_COUNT = "worker_count";
@@ -232,14 +269,11 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
             throw std::runtime_error("config parse failure");
         }
 
-        if (!tree.isMember(CONFIG_KEY_GEARMAN_SERVER_TIMEOUT) ||
-            !tree.isMember(CONFIG_KEY_GEARMAN_SERVERS_LIST) ||
+        if (!tree.isMember(CONFIG_KEY_GEARMAN_SERVERS_LIST) ||
             !tree.isMember(CONFIG_KEY_POOLS_LIST) ||
-            !tree[CONFIG_KEY_GEARMAN_SERVER_TIMEOUT].isUInt() ||
             !tree[CONFIG_KEY_GEARMAN_SERVERS_LIST].isArray() ||
             !tree[CONFIG_KEY_POOLS_LIST].isObject()) {
             LOG4CXX_ERROR(MainLogger, "Config (" << m_config_filename << ") has one or more key malformed elements (" <<
-                                      CONFIG_KEY_GEARMAN_SERVER_TIMEOUT << ", " <<
                                       CONFIG_KEY_GEARMAN_SERVERS_LIST << ", " <<
                                       CONFIG_KEY_POOLS_LIST << ")");
             throw std::runtime_error("config parse failure");
@@ -249,10 +283,6 @@ bool MainLoop::loadConfig(DriveshaftConfig& new_config) {
 
         new_config.m_servers_list.clear();
         new_config.m_pool_map.clear();
-
-        new_config.m_timeout = tree[CONFIG_KEY_GEARMAN_SERVER_TIMEOUT].asUInt();
-
-        LOG4CXX_DEBUG(MainLogger, "New config: timeout=" << new_config.m_timeout);
 
         const auto& servers_list = tree[CONFIG_KEY_GEARMAN_SERVERS_LIST];
         for (auto i = servers_list.begin(); i != servers_list.end(); ++i) {
@@ -320,8 +350,7 @@ std::pair<StringSet, StringSet> DriveshaftConfig::compare(const DriveshaftConfig
     boost::copy(new_config.m_pool_map | boost::adaptors::map_keys,
                 std::inserter(latest_pool_names, latest_pool_names.begin()));
 
-    if ((m_servers_list != new_config.m_servers_list) ||
-        (m_timeout != new_config.m_timeout)) {
+    if (m_servers_list != new_config.m_servers_list) {
         // Everything needs restarting
         return std::pair<StringSet, StringSet>(std::move(current_pool_names),
                                                std::move(latest_pool_names));
