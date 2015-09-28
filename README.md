@@ -102,8 +102,8 @@ shutdown wait durations (hard shutdown is 2x, and graceful is 4x this value).
 
 ## status port
 The server listens on `status_port` and currently supports the command `threads`.
-For every running thread, the server returns back text formatted as  
-`<Thread-ID>\t<Pool-Name>\t<Shutdown-Flag>\tjob_handle=<Job-Handle> job_unique=<Job-Unique>\r\n`  
+For every running thread, the server returns back text formatted as
+`<Thread-ID>\t<Pool-Name>\t<Shutdown-Flag>\tjob_handle=<Job-Handle> job_unique=<Job-Unique>\r\n`
 
 # Design
 1. Jobs are grouped into pools and every pool has a `worker_count` setting in order
@@ -126,6 +126,30 @@ Driveshaft saves gearmand a lot of work that impacts enqueue latency.
 
 And by using an HTTP endpoint to actually do the heavy lifting, we get the
 benefits of a clean-sandbox and Opcache (and can even use HHVM!).
+
+## Endpoint Request Format
+
+Driveshaft will send the job name and arguments via a POST request. Example:
+```
+{
+    "function_name": "Sum",
+    "job_handle": "H:localhost:6",
+    "unique": "57a7b604-659a-11e5-9442-04013e647701",
+    "workload": "[1,2]"
+}
+```
+
+## Endpoint Response Format
+
+The endpoint should respond with a JSON payload in the body of the document.
+Success is indicated by returning zero for `gearman_ret`. The response string
+must be a string. Non-strings will not be accepted. Example:
+```
+{
+    "gearman_ret": 0,
+    "response_string" => "3"
+}
+```
 
 # Contribute
 See the [Contributing Guide](https://github.com/keyurdg/driveshaft/blob/master/CONTRIBUTING.md)
