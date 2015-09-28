@@ -77,7 +77,7 @@ echo $work_script > $work_script_path
 
 # Start httpd
 echo "Starting httpd (php -S)..."
-php -c integration.ini -S localhost:$httpd_port $work_script_path &
+php -c $driveshaft_home/tests/integration.ini -S localhost:$httpd_port $work_script_path &
 httpd_pid=$!
 sleep 1
 
