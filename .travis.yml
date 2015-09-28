@@ -15,6 +15,5 @@ before_install:
 - sudo apt-get update
 - sudo apt-get install -qq build-essential gcc-4.8 g++-4.8 clang liblog4cxx10-dev libboost1.53-all-dev php-pear php5-dev
 - sudo apt-get install libgearman-dev gearman-job-server gearman libgearman7
-- sudo echo "extension=gearman.so" >> /etc/php.ini
 - sudo apt-get install libcurl4-openssl-dev
 - sudo pecl install gearman

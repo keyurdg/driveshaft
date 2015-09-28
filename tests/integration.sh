@@ -26,7 +26,7 @@ which $gearmand_bin >/dev/null 2>&1 || die "$gearmand_bin is not in PATH; overri
 which $driveshaft_bin >/dev/null 2>&1 || die "$driveshaft_bin is not in PATH; override with DRIVESHAFT_BIN"
 which nc >/dev/null 2>&1 || die "nc not in PATH"
 which php >/dev/null 2>&1 || die "php not in PATH"
-( php -i | grep 'gearman.*enabled' ) >/dev/null 2>&1 || die "gearman php extension does not appear to be installed"
+#( php -i | grep 'gearman.*enabled' ) >/dev/null 2>&1 || die "gearman php extension does not appear to be installed"
 
 # Start gearmand
 echo "Starting gearmand..."
@@ -77,7 +77,7 @@ echo $work_script > $work_script_path
 
 # Start httpd
 echo "Starting httpd (php -S)..."
-php -S localhost:$httpd_port $work_script_path &
+php -c integration.ini -S localhost:$httpd_port $work_script_path &
 httpd_pid=$!
 sleep 1
 
