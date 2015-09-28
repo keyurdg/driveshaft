@@ -11,6 +11,7 @@ before_install:
 - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 - sudo add-apt-repository ppa:yavdr/main -y
 - sudo add-apt-repository ppa:apokluda/boost1.53 -y
+- sudo add-apt-repository ppa:oleksiyk/ppa -y
 - sudo apt-get update -qq
 - sudo apt-get install -qq build-essential gcc-4.8 g++-4.8 clang libgearman-dev liblog4cxx10-dev libboost1.53-all-dev gearman-job-server php-pear php5-dev
 - sudo apt-get install libcurl4-openssl-dev>=7.25
