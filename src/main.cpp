@@ -18,6 +18,7 @@
 #include <log4cxx/helpers/exception.h>
 #include "common-defs.h"
 #include "main-loop.h"
+#include "version.h"
 
 namespace Driveshaft {
 
@@ -49,6 +50,7 @@ int main(int argc, char **argv) {
     po::options_description desc("Allowed options");
     desc.add_options()
             ("help", "produce help message")
+            ("version", "print version string")
             ("jobsconfig", po::value<std::string>(&jobs_config_file), "jobs config file path")
             ("logconfig", po::value<std::string>(&log_config_file), "log config file path")
             ("max_running_time", po::value<uint32_t>(&Driveshaft::MAX_JOB_RUNNING_TIME), "how long can a job run before it is considered failed (in seconds)")
@@ -60,6 +62,10 @@ int main(int argc, char **argv) {
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
         po::notify(vm);
+        if (vm.count("version")) {
+            std::cout << "driveshaft version: " DRIVESHAFT_VERSION << std::endl;
+            return 1;
+        }
         if (vm.empty()
             || vm.count("help")
             || !vm.count("jobsconfig")

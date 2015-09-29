@@ -1,0 +1,3 @@
+#ifndef DRIVESHAFT_VERSION
+#define DRIVESHAFT_VERSION "0.1.0"
+#endif

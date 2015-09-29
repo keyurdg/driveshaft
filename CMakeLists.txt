@@ -5,7 +5,7 @@ SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
 
 # package information
 SET(PACKAGE_NAME      "driveshaft")
-SET(PACKAGE_VERSION   "0.1")
+SET(PACKAGE_VERSION   "0.1.0")
 SET(PACKAGE_STRING    "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 SET(PACKAGE_TARNAME   "${PACKAGE_NAME}-${PACKAGE_VERSION}")
 SET(PACKAGE_BUGREPORT "https://github.com/keyurdg/driveshaft/issues")
@@ -27,6 +27,10 @@ include(FindLog4cxx)
 MARK_AS_ADVANCED(CLEAR CMAKE_INSTALL_PREFIX)
 
 INCLUDE(CheckFunctionExists)
+
+FILE(WRITE src/version.h
+  "\#ifndef DRIVESHAFT_VERSION\n\#define DRIVESHAFT_VERSION \"@PACKAGE_VERSION@\"\n\#endif\n"
+  )
 
 ADD_SUBDIRECTORY(tests/unit/gtest-1.7.0)
 ADD_SUBDIRECTORY(src)
