@@ -80,7 +80,7 @@ echo $work_script > $work_script_path
 # Start httpd
 echo "Starting httpd (php -S)..."
 set -x
-php -c $driveshaft_home/tests/ -S localhost:$httpd_port $work_script_path &
+php -d "extension=gearman.so" -S localhost:$httpd_port $work_script_path &
 httpd_pid=$!
 sleep 1
 set +x
