@@ -115,12 +115,12 @@ fi
 
 # Cleanup
 echo "Cleaning up..."
-rm -f $driveshaft_config_path
-rm -f $work_script_path
-rm -f $gearmand_log
 kill -9 $gearmand_pid >/dev/null 2>&1
 kill -9 $driveshaft_pid >/dev/null 2>&1
 kill -9 $httpd_pid >/dev/null 2>&1
+rm -f $driveshaft_config_path
+rm -f $work_script_path
+rm -f $gearmand_log
 
 # Exit
 exit $exit_code
