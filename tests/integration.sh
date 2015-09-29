@@ -66,7 +66,6 @@ $driveshaft_bin --jobsconfig $driveshaft_config_path \
     --status_port ${driveshaft_status_port} &
 driveshaft_pid=$!
 sleep 1
-set +x
 
 # Write work script
 echo "Writing work script..."
@@ -82,11 +81,9 @@ echo $work_script > $work_script_path
 
 # Start httpd
 echo "Starting httpd (php -S)..."
-set -x
-php -d "extension=gearman.so" -S localhost:$httpd_port $work_script_path &
+php -d "extension=gearman.so"  -S localhost:$httpd_port $work_script_path &
 httpd_pid=$!
 sleep 1
-set +x
 
 # Queue job
 echo "Queuing job..."
@@ -107,7 +104,7 @@ read -r -d '' php_script <<'EOD'
     $client->runTasks();
     exit($exit_code);
 EOD
-timeout 2 php -r "$php_script" $gearmand_port
+timeout 2 php -d "extension=gearman.so" -r "$php_script" $gearmand_port
 exit_code=$?
 if [ $exit_code -eq 0 ]; then
     echo -e "\e[32mSuccess! :)\e[0m"
