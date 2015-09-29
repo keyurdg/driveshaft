@@ -18,6 +18,7 @@ gearmand_bin=${GEARMAND_BIN:-gearmand}
 driveshaft_bin=${DRIVESHAFT_BIN:-$driveshaft_home/src/driveshaft}
 gearmand_port=47301
 httpd_port=47302
+driveshaft_status_port=47303
 
 # Do sanity checks
 echo "Doing sanity checks..."
@@ -26,7 +27,7 @@ which $gearmand_bin >/dev/null 2>&1 || die "$gearmand_bin is not in PATH; overri
 which $driveshaft_bin >/dev/null 2>&1 || die "$driveshaft_bin is not in PATH; override with DRIVESHAFT_BIN"
 which nc >/dev/null 2>&1 || die "nc not in PATH"
 which php >/dev/null 2>&1 || die "php not in PATH"
-( php -i | grep 'gearman.*enabled' ) >/dev/null 2>&1 || die "gearman php extension does not appear to be installed"
+#( php -i | grep 'gearman.*enabled' ) >/dev/null 2>&1 || die "gearman php extension does not appear to be installed"
 
 # Start gearmand
 echo "Starting gearmand..."
@@ -59,7 +60,10 @@ echo $driveshaft_config > $driveshaft_config_path
 
 # Start driveshaft
 echo "Starting driveshaft..."
-$driveshaft_bin --jobsconfig $driveshaft_config_path --logconfig "$driveshaft_home/logconfig.xml" &
+$driveshaft_bin --jobsconfig $driveshaft_config_path \
+    --logconfig "$driveshaft_home/logconfig.xml" \
+    --max_running_time 3600 --loop_timeout 1 \
+    --status_port ${driveshaft_status_port} &
 driveshaft_pid=$!
 sleep 1
 
@@ -77,7 +81,7 @@ echo $work_script > $work_script_path
 
 # Start httpd
 echo "Starting httpd (php -S)..."
-php -S localhost:$httpd_port $work_script_path &
+php -d "extension=gearman.so"  -S localhost:$httpd_port $work_script_path &
 httpd_pid=$!
 sleep 1
 
@@ -100,7 +104,7 @@ read -r -d '' php_script <<'EOD'
     $client->runTasks();
     exit($exit_code);
 EOD
-timeout 5 php -r "$php_script" $gearmand_port
+timeout 2 php -d "extension=gearman.so" -r "$php_script" $gearmand_port
 exit_code=$?
 if [ $exit_code -eq 0 ]; then
     echo -e "\e[32mSuccess! :)\e[0m"
