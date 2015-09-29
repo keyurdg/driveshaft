@@ -18,6 +18,7 @@ gearmand_bin=${GEARMAND_BIN:-gearmand}
 driveshaft_bin=${DRIVESHAFT_BIN:-$driveshaft_home/src/driveshaft}
 gearmand_port=47301
 httpd_port=47302
+driveshaft_status_port=47303
 
 # Do sanity checks
 echo "Doing sanity checks..."
@@ -61,7 +62,8 @@ echo $driveshaft_config > $driveshaft_config_path
 echo "Starting driveshaft..."
 $driveshaft_bin --jobsconfig $driveshaft_config_path \
     --logconfig "$driveshaft_home/logconfig.xml" \
-    --max_running_time 3600 --loop_timeout 1 &
+    --max_running_time 3600 --loop_timeout 1 \
+    --status_port ${driveshaft_status_port} &
 driveshaft_pid=$!
 sleep 1
 set +x
