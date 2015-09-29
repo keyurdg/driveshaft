@@ -9,3 +9,4 @@ driveshaft_unit_tests
 CTestTestfile.cmake
 Testing/
 *.a
+src/version.h
