@@ -59,9 +59,11 @@ echo $driveshaft_config > $driveshaft_config_path
 
 # Start driveshaft
 echo "Starting driveshaft..."
+set -x
 $driveshaft_bin --jobsconfig $driveshaft_config_path --logconfig "$driveshaft_home/logconfig.xml" &
 driveshaft_pid=$!
 sleep 1
+set +x
 
 # Write work script
 echo "Writing work script..."
@@ -77,9 +79,11 @@ echo $work_script > $work_script_path
 
 # Start httpd
 echo "Starting httpd (php -S)..."
-php -c $driveshaft_home/tests/integration.ini -S localhost:$httpd_port $work_script_path &
+set -x
+php -c $driveshaft_home/tests/ -S localhost:$httpd_port $work_script_path &
 httpd_pid=$!
 sleep 1
+set +x
 
 # Queue job
 echo "Queuing job..."
