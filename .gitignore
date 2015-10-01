@@ -10,3 +10,4 @@ CTestTestfile.cmake
 Testing/
 *.a
 src/version.h
+driveshaft.1

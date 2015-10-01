@@ -1,0 +1,26 @@
+NAME
+  driveshaft - Gearman Job Manager
+SYNOPSIS
+  driveshaft --jobsconfig arg --max_running_time arg --status_port arg
+             --log_config arg --loop_timeout arg
+DESCRIPTION
+  driveshaft is a job manager for Gearman jobs
+
+OPTIONS
+  --help                  produce help message
+  --version               print version string
+  --user arg              username to run as
+  --pid_file arg          file to write process ID out to
+  --daemonize             Daemon, detach and run in the background
+  --jobsconfig arg        jobs config file path
+  --logconfig arg         log config file path
+  --max_running_time arg  how long can a job run before it is considered failed
+                          (in seconds)
+  --loop_timeout arg      how long to wait for a response from gearmand before
+                          restarting event-loop (in seconds)
+  --status_port arg       port to listen on to return status
+
+SEE ALSO
+  gearmand(8)
+AUTHOR
+  Keyur Govande <kgovande@etsy.com>

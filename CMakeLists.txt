@@ -39,6 +39,13 @@ INCLUDE_DIRECTORIES(tests/unit/gtest-1.7.0/include ${COMMON_INCLUDES})
 # use GNU install dirs (e.g. lib64 instead of lib)
 INCLUDE(GNUInstallDirs)
 
+add_custom_command(OUTPUT driveshaft.1
+  COMMAND txt2man -t "driveshaft" -s 1 -v "User Manual" driveshaft.1.txt > driveshaft.1
+  DEPENDS driveshaft.1.txt)
+
+add_custom_target (manpage DEPENDS driveshaft.1)
+
+
 enable_testing()
 add_executable(driveshaft_unit_tests tests/unit/tests.cpp)
 target_link_libraries(driveshaft_unit_tests gtest)
