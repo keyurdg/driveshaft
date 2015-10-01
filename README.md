@@ -30,6 +30,9 @@ driveshaft takes two arguments:
 $ driveshaft
 Allowed options:
   --help                    produce help message
+  --user arg                username to run as (OPTIONAL)
+  --pid_file arg            file to write process ID out to (OPTIONAL)
+  --daemonize               Daemon, detach and run in the background (OPTIONAL)
   --jobsconfig arg          jobs config file path
   --logconfig arg           log config file path
   --max_running_time arg    how long can a job run before it is considered failed
@@ -102,7 +105,7 @@ shutdown wait durations (hard shutdown is 2x, and graceful is 4x this value).
 
 ## status port
 The server listens on `status_port` and currently supports the command `threads`.
-For every running thread, the server returns back text formatted as
+For every running thread, the server returns back text formatted as 
 `<Thread-ID>\t<Pool-Name>\t<Shutdown-Flag>\tjob_handle=<Job-Handle> job_unique=<Job-Unique>\r\n`
 
 # Design
