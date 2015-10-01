@@ -166,6 +166,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         LOG4CXX_ERROR(ThreadLogger, "Unable to set tcp_nodelay");
         goto error;
     }
+#ifdef HAVE_CURLOPT_TCP_KEEPALIVE
     if (curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to set tcp_keepalive");
         goto error;
@@ -178,6 +179,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         LOG4CXX_ERROR(ThreadLogger, "Unable to set tcp_keepintvl");
         goto error;
     }
+#endif
     if (curl_easy_setopt(curl, CURLOPT_URL, m_http_uri.c_str()) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to set URL");
         goto error;
