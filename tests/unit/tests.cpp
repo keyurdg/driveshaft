@@ -24,10 +24,48 @@
  */
 
 #include <iostream>
-#include <gtest/gtest.h>
+#include "gtest/gtest.h"
+#include <boost/program_options.hpp>
+#include <log4cxx/logger.h>
+#include <log4cxx/consoleappender.h>
+#include <log4cxx/simplelayout.h>
 
-int main(int argc, char **argv)
-{
-	::testing::InitGoogleTest(&argc, argv);
-	return RUN_ALL_TESTS();
+namespace Driveshaft {
+    // define a symbol for MainLogger
+    log4cxx::LoggerPtr MainLogger(log4cxx::Logger::getLogger("testing"));
+}
+
+void configureLoggersForTesting(const boost::program_options::variables_map &options) {
+    auto testLogger = log4cxx::Logger::getLogger("testing");
+    log4cxx::LevelPtr currentLevel(testLogger->getLevel());
+    log4cxx::LevelPtr targetLevel(log4cxx::Level::getOff());
+
+    if (options.count("verbose")) {
+        auto consoleAppender = new log4cxx::ConsoleAppender(
+                log4cxx::LayoutPtr(new log4cxx::SimpleLayout())
+                );
+
+        testLogger->addAppender(consoleAppender);
+        targetLevel = currentLevel;
+    }
+
+    testLogger->setLevel(targetLevel);
+}
+
+boost::program_options::variables_map parseCommandLine(int argc, char **argv) {
+    namespace po = boost::program_options;
+    po::options_description desc("Allowed options");
+    desc.add_options()("verbose,v", "dump log output to console");
+
+    po::variables_map options;
+    po::store(po::parse_command_line(argc, argv, desc), options);
+    po::notify(options);
+    return options;
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    auto options(parseCommandLine(argc, argv));
+    configureLoggersForTesting(options);
+    return RUN_ALL_TESTS();
 }
