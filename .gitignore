@@ -11,3 +11,4 @@ Testing/
 *.a
 src/version.h
 driveshaft.1
+bin/
