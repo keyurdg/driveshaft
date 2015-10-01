@@ -147,7 +147,6 @@ int main(int argc, char **argv) {
     try {
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
-        po::notify(vm);
         if (vm.count("version")) {
             std::cout << "driveshaft version: " DRIVESHAFT_VERSION << std::endl;
             return 1;
@@ -157,6 +156,8 @@ int main(int argc, char **argv) {
             std::cout << desc << std::endl;
             return 1;
         }
+
+        po::notify(vm);
     } catch (std::exception& e) {
         std::cout << e.what() << std::endl;
         std::cout << desc << std::endl;
