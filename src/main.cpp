@@ -23,13 +23,15 @@
  *
  */
 
-#include <string>
-#include <iostream>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include <pwd.h>
+#include <stdio.h>
+#include <string>
+#include <iostream>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/program_options.hpp>
@@ -44,6 +46,7 @@
 #include "common-defs.h"
 #include "main-loop.h"
 #include "version.h"
+#include "pidfile.h"
 
 namespace Driveshaft {
 
@@ -65,10 +68,65 @@ uint32_t GRACEFUL_SHUTDOWN_WAIT_DURATION;
 
 }
 
+/* true on success, false on failure */
+static bool switch_user(const std::string& username) {
+    if (getuid() == 0 || geteuid() == 0) {
+        struct passwd *pw = getpwnam(username.c_str());
+        if (!pw) {
+            std::cout << "Could not find user: " << username << std::endl;
+            return false;
+        }
+
+        if (setgid(pw->pw_gid) == -1 || setuid(pw->pw_uid) == -1) {
+            std::cout << "Could not switch to user: " << username << std::endl;
+            return false;
+        }
+    } else {
+        std::cout << "Must be root to switch users" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+static bool do_daemon() {
+    pid_t child = fork();
+
+    switch (child) {
+    case -1:
+        /* strerror is OK because we're still in a single threaded context */
+        std::cout << "Failed to fork child. errno: " << errno << ". Error details: " << strerror(errno) << std::endl;
+        return false;
+
+    case 0:
+        /* child */
+        break;
+
+    default:
+        /* parent */
+        exit(0);
+    }
+
+    if (setsid() == -1) {
+        std::cout << "Failed to setsid in child process: errno: " << errno << ". Error details: " << strerror(errno) << std::endl;
+        return false;
+    }
+
+    if (chdir("/") < 0) {
+        std::cout << "Failed to chdir to / in child process: errno: " << errno << ". Error details: " << strerror(errno) << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 int main(int argc, char **argv) {
     int rc;
     std::string jobs_config_file;
     std::string log_config_file;
+    std::string username;
+    std::string pid_filename;
+    bool daemonize = false;
 
     /* Parse command line opts */
     namespace po = boost::program_options;
@@ -76,11 +134,14 @@ int main(int argc, char **argv) {
     desc.add_options()
             ("help", "produce help message")
             ("version", "print version string")
-            ("jobsconfig", po::value<std::string>(&jobs_config_file), "jobs config file path")
-            ("logconfig", po::value<std::string>(&log_config_file), "log config file path")
-            ("max_running_time", po::value<uint32_t>(&Driveshaft::MAX_JOB_RUNNING_TIME), "how long can a job run before it is considered failed (in seconds)")
-            ("loop_timeout", po::value<uint32_t>(&Driveshaft::GEARMAND_RESPONSE_TIMEOUT), "how long to wait for a response from gearmand before restarting event-loop (in seconds)")
-            ("status_port", po::value<uint32_t>(&Driveshaft::STATUS_PORT), "port to listen on to return status")
+            ("user", po::value<std::string>(&username), "username to run as")
+            ("pid_file", po::value<std::string>(&pid_filename), "file to write process ID out to")
+            ("daemonize", po::bool_switch(&daemonize)->default_value(false), "Daemon, detach and run in the background")
+            ("jobsconfig", po::value<std::string>(&jobs_config_file)->required(), "jobs config file path")
+            ("logconfig", po::value<std::string>(&log_config_file)->required(), "log config file path")
+            ("max_running_time", po::value<uint32_t>(&Driveshaft::MAX_JOB_RUNNING_TIME)->required(), "how long can a job run before it is considered failed (in seconds)")
+            ("loop_timeout", po::value<uint32_t>(&Driveshaft::GEARMAND_RESPONSE_TIMEOUT)->required(), "how long to wait for a response from gearmand before restarting event-loop (in seconds)")
+            ("status_port", po::value<uint32_t>(&Driveshaft::STATUS_PORT)->required(), "port to listen on to return status")
     ;
 
     try {
@@ -91,13 +152,8 @@ int main(int argc, char **argv) {
             std::cout << "driveshaft version: " DRIVESHAFT_VERSION << std::endl;
             return 1;
         }
-        if (vm.empty()
-            || vm.count("help")
-            || !vm.count("jobsconfig")
-            || !vm.count("logconfig")
-            || !vm.count("max_running_time")
-            || !vm.count("status_port")
-            || !vm.count("loop_timeout")) {
+
+        if (vm.empty() || vm.count("help")) {
             std::cout << desc << std::endl;
             return 1;
         }
@@ -110,6 +166,21 @@ int main(int argc, char **argv) {
     Driveshaft::LOOP_SLEEP_DURATION = (uint32_t) (Driveshaft::GEARMAND_RESPONSE_TIMEOUT / 2);
     Driveshaft::HARD_SHUTDOWN_WAIT_DURATION = Driveshaft::GEARMAND_RESPONSE_TIMEOUT * 2;
     Driveshaft::GRACEFUL_SHUTDOWN_WAIT_DURATION = Driveshaft::HARD_SHUTDOWN_WAIT_DURATION * 2;
+
+    if ((username.length() > 0) && (switch_user(username) == false)) {
+        return 1;
+    }
+
+    if (daemonize && (do_daemon() == false)) {
+        return 1;
+    }
+
+    // RAII: On going out of scope will clean up the file
+    datadifferential::util::Pidfile pid_file(pid_filename);
+    if ((pid_filename.length() > 0) && (pid_file.create() == false)) {
+        std::cout << "Unable to write pidfile due to errors: " << pid_file.error_message() << std::endl;
+        return 1;
+    }
 
     /* Load log config */
     try {
