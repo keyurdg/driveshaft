@@ -46,7 +46,11 @@ namespace Driveshaft {
 
 static std::mutex s_new_thread_mutex;
 static std::condition_variable s_new_thread_cond;
-static bool s_new_thread_wakeup = false;
+static enum class ThreadStartState {
+    INIT,
+    SUCCESS,
+    FAILURE
+} s_new_thread_wakeup = ThreadStartState::INIT;
 
 static void gearman_thread_delegate(ThreadRegistryPtr registry,
                             std::string pool,
@@ -186,14 +190,6 @@ bool MainLoop::setupSignals() const noexcept {
     return true;
 }
 
-static std::mutex s_new_thread_mutex;
-static std::condition_variable s_new_thread_cond;
-static enum class ThreadStartState {
-    INIT,
-    SUCCESS,
-    FAILURE
-} s_new_thread_wakeup = ThreadStartState::INIT;
-
 static void status_thread_delegate(ThreadRegistryPtr registry) {
     using boost::asio::ip::tcp;
     using namespace boost::asio;
@@ -236,5 +232,6 @@ void MainLoop::startStatusThread() {
         t.join();
         throw std::runtime_error("cannot start status thread");
     }
-
 }
+
+} // namespace Driveshaft
