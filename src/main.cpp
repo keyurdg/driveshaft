@@ -206,7 +206,7 @@ int main(int argc, char **argv) {
         LOG4CXX_INFO(Driveshaft::MainLogger, "Starting up with gearmand response timeout=" << Driveshaft::GEARMAND_RESPONSE_TIMEOUT
                                              << " and max running time=" << Driveshaft::MAX_JOB_RUNNING_TIME);
 
-        Driveshaft::MainLoopImpl loop(jobs_config_file);
+        Driveshaft::MainLoop loop(jobs_config_file);
         loop.run();
     } catch (std::exception& e) {
         std::cout << "MainLoop threw exception: " << e.what() << std::endl;
