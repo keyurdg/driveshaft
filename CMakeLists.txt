@@ -28,26 +28,13 @@ include(GNUInstallDirs) # use GNU install dirs (e.g. lib64 instead of lib)
 
 mark_as_advanced(CLEAR CMAKE_INSTALL_PREFIX)
 
-add_subdirectory(tests/unit/gtest-1.7.0)
 add_subdirectory(src bin/)
+
+enable_testing()
+add_subdirectory(tests bin/test/)
 
 file(WRITE src/version.h
   "\#ifndef DRIVESHAFT_VERSION\n\#define DRIVESHAFT_VERSION \"@PACKAGE_VERSION@\"\n\#endif\n"
-)
-
-include_directories(src tests/unit/gtest-1.7.0/include ${COMMON_INCLUDES})
-
-add_executable(
-    driveshaft_unit_tests
-    tests/unit/test_driveshaft_config.cpp
-    tests/unit/tests.cpp
-)
-
-target_link_libraries(
-    driveshaft_unit_tests
-    gtest
-    driveshaft
-    ${DRIVESHAFT_LINK_LIBRARIES}
 )
 
 add_custom_command(OUTPUT driveshaft.1
@@ -55,8 +42,3 @@ add_custom_command(OUTPUT driveshaft.1
   DEPENDS driveshaft.1.txt)
 
 add_custom_target (manpage DEPENDS driveshaft.1)
-
-
-enable_testing()
-add_test(AllTestsInDriveShaft driveshaft_unit_tests)
-include(AddIntegrationTest)
