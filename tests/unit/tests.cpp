@@ -24,20 +24,28 @@
  */
 
 #include <iostream>
+#include <atomic>
 #include "gtest/gtest.h"
 #include <boost/program_options.hpp>
 #include <log4cxx/logger.h>
 #include <log4cxx/consoleappender.h>
 #include <log4cxx/simplelayout.h>
 
+// export some global symbols setup in main.cpp
 namespace Driveshaft {
-    // define a symbol for MainLogger
-    log4cxx::LoggerPtr MainLogger(log4cxx::Logger::getLogger("testing"));
+    log4cxx::LoggerPtr MainLogger(log4cxx::Logger::getLogger("testing-main"));
+    log4cxx::LoggerPtr ThreadLogger(log4cxx::Logger::getLogger("testing-thread"));
+
+    std::atomic_bool g_force_shutdown(false);
+
+    uint32_t MAX_JOB_RUNNING_TIME = 5;
+    uint32_t GEARMAND_RESPONSE_TIMEOUT = 5;
 }
 
 void configureLoggersForTesting(const boost::program_options::variables_map &options) {
-    auto testLogger = log4cxx::Logger::getLogger("testing");
-    log4cxx::LevelPtr currentLevel(testLogger->getLevel());
+    auto testMainLogger = log4cxx::Logger::getLogger("testing-main");
+    auto testThreadLogger = log4cxx::Logger::getLogger("testing-thread");
+    log4cxx::LevelPtr currentLevel(testMainLogger->getLevel());
     log4cxx::LevelPtr targetLevel(log4cxx::Level::getOff());
 
     if (options.count("verbose")) {
@@ -45,11 +53,13 @@ void configureLoggersForTesting(const boost::program_options::variables_map &opt
                 log4cxx::LayoutPtr(new log4cxx::SimpleLayout())
                 );
 
-        testLogger->addAppender(consoleAppender);
+        testMainLogger->addAppender(consoleAppender);
+        testThreadLogger->addAppender(consoleAppender);
         targetLevel = currentLevel;
     }
 
-    testLogger->setLevel(targetLevel);
+    testMainLogger->setLevel(targetLevel);
+    testThreadLogger->setLevel(targetLevel);
 }
 
 boost::program_options::variables_map parseCommandLine(int argc, char **argv) {
