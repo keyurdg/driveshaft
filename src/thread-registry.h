@@ -50,8 +50,20 @@ struct ThreadData {
 typedef std::map<std::thread::id, ThreadData> ThreadMap;
 typedef std::map<std::string, std::set<std::thread::id> > ThreadRegistryStore;
 
-class ThreadRegistry {
+class ThreadRegistryInterface {
+public:
+    virtual ~ThreadRegistryInterface() noexcept {}
 
+    virtual void registerThread(const std::string& pool, std::thread::id tid) noexcept = 0;
+    virtual void unregisterThread(const std::string& pool, std::thread::id tid) noexcept = 0;
+    virtual uint32_t poolCount(const std::string& pool) noexcept = 0;
+    virtual bool sendShutdown(const std::string& pool, uint32_t count) noexcept = 0;
+    virtual bool shouldShutdown(std::thread::id tid) noexcept = 0;
+    virtual void setThreadState(std::thread::id tid, const std::string& state) noexcept = 0;
+    virtual ThreadMap getThreadMap() noexcept = 0;
+};
+
+class ThreadRegistry : public ThreadRegistryInterface {
 public:
     ThreadRegistry() noexcept;
     ~ThreadRegistry() noexcept;
@@ -75,7 +87,7 @@ private:
     std::mutex m_mutex;
 };
 
-typedef std::shared_ptr<ThreadRegistry> ThreadRegistryPtr;
+typedef std::shared_ptr<ThreadRegistryInterface> ThreadRegistryPtr;
 
 }
 
