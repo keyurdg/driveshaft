@@ -32,6 +32,25 @@
 
 namespace Driveshaft {
 
+class StringstreamWriter : public Writer {
+public:
+    StringstreamWriter() {
+        // enable exception semantics
+        this->stream.exceptions(std::ios::failbit);
+    }
+
+    size_t write(const char *str, size_t len) {
+        this->stream.write(str, len);
+        return len;
+    }
+
+    std::string str() {
+        return this->stream.str();
+    }
+private:
+    std::stringstream stream;
+};
+
 void* worker_callback(gearman_job_st *job, void *context,
                       size_t *result_size,
                       gearman_return_t *ret_ptr) noexcept {
@@ -54,10 +73,10 @@ void* worker_callback(gearman_job_st *job, void *context,
 /* return of 0 means the write failed and curl will abort the transfer */
 size_t curl_write_func(char *ptr, size_t size, size_t nmemb, void *userdata) noexcept {
     LOG4CXX_DEBUG(ThreadLogger, "Starting curl write callback");
-    std::stringstream *write_to = (std::stringstream *) userdata;
+    Writer *stream = static_cast<Writer*>(userdata);
     size_t len = size*nmemb;
     try {
-        write_to->write(ptr, len);
+        stream->write(ptr, len);
     } catch (const std::exception &e) {
         return 0;
     }
@@ -131,7 +150,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     struct curl_slist *headerlist = nullptr;
     gearman_return_t gearman_ret = GEARMAN_SUCCESS;
     time_t start_ts = time(nullptr);
-    std::stringstream raw_resp;
+    StringstreamWriter raw_resp;
     const char *job_function_name = static_cast<const char *>(gearman_job_function_name(job_ptr));
     const char *job_handle = static_cast<const char *>(gearman_job_handle(job_ptr));
     const char *job_unique = static_cast<const char *>(gearman_job_unique(job_ptr));
@@ -258,7 +277,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         std::string parse_errors;
 
         if (!m_json_parser->parse(resp_begin, resp_end, &tree, &parse_errors)) {
-            LOG4CXX_ERROR(ThreadLogger, "Failed to parse response. Raw response: " << raw_resp << " Errors: " << parse_errors);
+            LOG4CXX_ERROR(ThreadLogger, "Failed to parse response. Raw response: " << raw_resp_str << " Errors: " << parse_errors);
             goto error;
         }
 

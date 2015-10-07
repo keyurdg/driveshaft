@@ -44,8 +44,14 @@ int curl_progress_func(void *p, double dltotal, double dlnow,
 
 void gearman_client_deleter(gearman_worker_st *ptr) noexcept;
 
-class GearmanClient {
+class Writer {
+public:
+    // throws on failure
+    virtual size_t write(const char *str, size_t len) = 0;
+    virtual std::string str() = 0;
+};
 
+class GearmanClient {
 public:
     GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, const StringSet& jobs_list, const std::string& http_uri);
     ~GearmanClient() = default;
