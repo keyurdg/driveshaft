@@ -41,6 +41,7 @@
 #include "main-loop.h"
 #include "thread-loop.h"
 #include "status-loop.h"
+#include "gearman-client.h"
 
 namespace Driveshaft {
 
@@ -58,7 +59,9 @@ static void gearman_thread_delegate(ThreadRegistryPtr registry,
                             StringSet jobs_list,
                             std::string http_uri) noexcept {
     std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-    ThreadLoop loop(registry, pool, servers_list, jobs_list, http_uri);
+    GearmanClient *client = new GearmanClient(registry, servers_list,
+                                              jobs_list, http_uri);
+    ThreadLoop loop(registry, pool, client);
     s_new_thread_wakeup = ThreadStartState::SUCCESS;
     lock.unlock();
     s_new_thread_cond.notify_one();

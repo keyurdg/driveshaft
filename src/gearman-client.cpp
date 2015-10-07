@@ -123,7 +123,6 @@ GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server
     m_json_parser.reset(jsonfactory.newCharReader());
 
     m_state = State::GRAB_JOB;
-    m_registry->setThreadState(std::this_thread::get_id(), std::string("Waiting for work"));
 }
 
 gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string& return_string) noexcept {
