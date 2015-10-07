@@ -35,6 +35,13 @@
 
 namespace Driveshaft {
 
+void* worker_callback(gearman_job_st *job, void *context,
+                      size_t *result_size,
+                      gearman_return_t *ret_ptr) noexcept;
+size_t curl_write_func(char *ptr, size_t size, size_t nmemb, void *userdata) noexcept;
+int curl_progress_func(void *p, double dltotal, double dlnow,
+                                  double ultotal, double ulnow) noexcept;
+
 void gearman_client_deleter(gearman_worker_st *ptr) noexcept;
 
 class GearmanClient {
