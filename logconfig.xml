@@ -1,20 +1,33 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
 
-  <appender name="ROLL" class="org.apache.log4j.rolling.RollingFileAppender">
-    <rollingPolicy class="org.apache.log4j.rolling.TimeBasedRollingPolicy">
-      <param name="FileNamePattern" value="/var/log/driveshaft/runlog-%d{yyyy-MM-dd}.log.gz"/>
-    </rollingPolicy>
-
+  <appender name="RollInfo" class="org.apache.log4j.DailyRollingFileAppender">
+    <param name="Threshold" value="INFO"/>
+    <param name="File" value="/var/log/driveshaft/info.log"/>
+    <param name="DatePattern" value="'-'%d{yyyyMMdd}"/>
     <layout class="org.apache.log4j.PatternLayout">
       <param name="ConversionPattern" value="[%d] [%t] [%p] [%t] [%c] %m%n"/>
     </layout>
   </appender>
 
+  <appender name="RollError" class="org.apache.log4j.DailyRollingFileAppender">
+    <param name="Threshold" value="ERROR"/>
+    <param name="File" value="/var/log/driveshaft/error.log"/>
+    <param name="DatePattern" value="'-'%d{yyyyMMdd}"/>
+    <layout class="org.apache.log4j.PatternLayout">
+      <param name="ConversionPattern" value="[%d] [%t] [%p] [%t] [%c] %m%n"/>
+    </layout>
+    <filter class="org.apache.log4j.varia.LevelMatchFilter">
+      <param name="LevelToMatch" value="ERROR"/>
+      <param name="AcceptOnMatch" value="true"/>
+    </filter>
+    <filter class="org.apache.log4j.varia.DenyAllFilter"/>
+  </appender>
+
   <root>
-    <priority value ="info"/>
-    <appender-ref ref="ROLL"/>
+    <priority value="info"/>
+    <appender-ref ref="RollInfo"/>
+    <appender-ref ref="RollError"/>
   </root>
 
 </log4j:configuration>
-
