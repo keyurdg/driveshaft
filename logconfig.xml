@@ -17,6 +17,11 @@
     <layout class="org.apache.log4j.PatternLayout">
       <param name="ConversionPattern" value="[%d] [%t] [%p] [%t] [%c] %m%n"/>
     </layout>
+    <filter class="org.apache.log4j.varia.LevelMatchFilter">
+      <param name="LevelToMatch" value="ERROR"/>
+      <param name="AcceptOnMatch" value="true"/>
+    </filter>
+    <filter class="org.apache.log4j.varia.DenyAllFilter"/>
   </appender>
 
   <root>
