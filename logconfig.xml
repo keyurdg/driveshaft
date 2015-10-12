@@ -6,7 +6,7 @@
     <param name="File" value="/var/log/driveshaft/info.log"/>
     <param name="DatePattern" value="'-'%d{yyyyMMdd}"/>
     <layout class="org.apache.log4j.PatternLayout">
-      <param name="ConversionPattern" value="[%d] [%t] [%p] [%t] [%c] %m%n"/>
+      <param name="ConversionPattern" value="[%d] [%p] [%t] [%c] %m%n"/>
     </layout>
   </appender>
 
@@ -15,7 +15,7 @@
     <param name="File" value="/var/log/driveshaft/error.log"/>
     <param name="DatePattern" value="'-'%d{yyyyMMdd}"/>
     <layout class="org.apache.log4j.PatternLayout">
-      <param name="ConversionPattern" value="[%d] [%t] [%p] [%t] [%c] %m%n"/>
+      <param name="ConversionPattern" value="[%d] [%p] [%t] [%c] %m%n"/>
     </layout>
     <filter class="org.apache.log4j.varia.LevelMatchFilter">
       <param name="LevelToMatch" value="ERROR"/>
