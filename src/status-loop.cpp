@@ -62,10 +62,10 @@ using namespace std::placeholders;
 static const std::string CR("\r");
 static const std::string STATUS_COMMAND_THREADS("threads");
 static const std::string STATUS_COMMAND_THREADS_CR(STATUS_COMMAND_THREADS + CR);
-// static const std::string STATUS_COMMAND_COUNTERS = "counters";
-// static const std::string STATUS_COMMAND_COUNTERS_CR(STATUS_COMMAND_COUNTERS + CR);
-// static const std::string STATUS_COMMAND_GAUGES("gauges");
-// static const std::string STATUS_COMMAND_GAUGES_CR(STATUS_COMMAND_GAUGES + CR);
+static const std::string STATUS_COMMAND_COUNTERS = "counters";
+static const std::string STATUS_COMMAND_COUNTERS_CR(STATUS_COMMAND_COUNTERS + CR);
+static const std::string STATUS_COMMAND_GAUGES("gauges");
+static const std::string STATUS_COMMAND_GAUGES_CR(STATUS_COMMAND_GAUGES + CR);
 
 class StatusResponder : public std::enable_shared_from_this<StatusResponder> {
 private:
@@ -102,6 +102,22 @@ private:
                     const auto &data = i.second;
                     os << i.first << "\t" << data.pool << "\t" << data.should_shutdown << "\t" << data.state << "\r\n";
                 }
+            } else if (!input.compare(STATUS_COMMAND_COUNTERS)
+                || !input.compare(STATUS_COMMAND_COUNTERS_CR)) {
+
+              LOG4CXX_DEBUG(StatusLogger, "Getting counters snapshot and sending it back.");
+              auto counters = Driveshaft::MetricsRegistry->GetCounters();
+              for (auto& kv : counters) {
+                    os << kv.first << ": " << kv.second << std::endl;
+              }
+            } else if (!input.compare(STATUS_COMMAND_GAUGES)
+                || !input.compare(STATUS_COMMAND_GAUGES_CR)) {
+
+              LOG4CXX_DEBUG(StatusLogger, "Getting gauges snapshot and sending it back.");
+              auto gauges = Driveshaft::MetricsRegistry->GetGauges();
+              for (auto& kv : gauges) {
+                    os << kv.first << ": " << kv.second << std::endl;
+              }
             } else {
                 os << "Error: unrecognized command\r\n";
             }

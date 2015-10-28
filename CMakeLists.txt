@@ -23,6 +23,7 @@ include(FindGearman)
 include(FindPThread)
 include(GetBoost)
 include(FindLog4cxx)
+include(FindSnyder)
 
 MARK_AS_ADVANCED(CLEAR CMAKE_INSTALL_PREFIX)
 

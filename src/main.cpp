@@ -43,6 +43,7 @@
 #include <log4cxx/propertyconfigurator.h>
 #include <log4cxx/xml/domconfigurator.h>
 #include <log4cxx/helpers/exception.h>
+#include <snyder/metrics_registry.h>
 #include "common-defs.h"
 #include "main-loop.h"
 #include "version.h"
@@ -53,6 +54,9 @@ namespace Driveshaft {
 static const char* MAIN_LOGGER_NAME = "Main";
 static const char* THREAD_LOGGER_NAME = "Thread";
 static const char* STATUS_LOGGER_NAME = "Status";
+
+// globally accesible metrics registry
+Snyder::MetricsRegistry* MetricsRegistry = new Snyder::MetricsRegistry();
 
 /* Define the externs from common-defs */
 std::atomic_bool g_force_shutdown;

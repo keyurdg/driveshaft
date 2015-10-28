@@ -33,6 +33,7 @@
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/asio.hpp>
+#include <snyder/metrics_registry.h>
 #include <exception>
 #include <utility>
 #include <mutex>
@@ -44,6 +45,8 @@
 #include "status-loop.h"
 
 namespace Driveshaft {
+
+  extern Snyder::MetricsRegistry* MetricsRegistry;
 
 MainLoop::MainLoop(const std::string& config_file) noexcept
     : m_config_filename(config_file)
@@ -255,6 +258,8 @@ void MainLoop::modifyPool(const std::string& name) noexcept {
             t.detach();
         }
     }
+    Driveshaft::MetricsRegistry->Gauge("running_workers_" + name,
+                                      (uint64_t)m_thread_registry->poolCount(name));
 }
 
 static const char* CONFIG_KEY_GEARMAN_SERVERS_LIST = "gearman_servers_list";
