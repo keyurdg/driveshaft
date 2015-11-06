@@ -212,10 +212,10 @@ void DriveshaftConfig::parsePoolList(const Json::Value &node) {
 bool DriveshaftConfig::needsConfigUpdate(const std::string &new_config_filename) const {
     boost::filesystem::path config_path(new_config_filename);
     std::time_t modified_time = boost::filesystem::last_write_time(config_path);
-    if (modified_time == (std::time_t)-1) {
+    if (modified_time == (std::time_t)(-1)) {
         LOG4CXX_ERROR(
             MainLogger,
-            "Unable to stat file " << new_config_filename <<
+            "Unable to ascertain config mtime " << new_config_filename <<
             ". Error: " << std::to_string(errno)
         );
         throw std::runtime_error("config stat failure");
