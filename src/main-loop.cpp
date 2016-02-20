@@ -32,6 +32,7 @@
 #include <errno.h>
 #include <fstream>
 #include <boost/asio.hpp>
+#include <snyder/metrics_registry.h>
 #include <exception>
 #include <utility>
 #include <mutex>
@@ -44,6 +45,8 @@
 #include "gearman-client.h"
 
 namespace Driveshaft {
+
+extern Snyder::MetricsRegistry* MetricsRegistry;
 
 static std::mutex s_new_thread_mutex;
 static std::condition_variable s_new_thread_cond;

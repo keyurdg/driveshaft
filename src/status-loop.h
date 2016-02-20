@@ -27,9 +27,12 @@
 #define incl_DRIVESHAFT_STATUS_LOOP_H_
 
 #include <boost/asio.hpp>
+#include <snyder/metrics_registry.h>
 #include "thread-registry.h"
 
 namespace Driveshaft {
+
+  extern Snyder::MetricsRegistry* MetricsRegistry;
 
 class StatusLoop {
 
