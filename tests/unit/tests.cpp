@@ -24,10 +24,58 @@
  */
 
 #include <iostream>
-#include <gtest/gtest.h>
+#include <atomic>
+#include "gtest/gtest.h"
+#include <boost/program_options.hpp>
+#include <log4cxx/logger.h>
+#include <log4cxx/consoleappender.h>
+#include <log4cxx/simplelayout.h>
 
-int main(int argc, char **argv)
-{
-	::testing::InitGoogleTest(&argc, argv);
-	return RUN_ALL_TESTS();
+// export some global symbols setup in main.cpp
+namespace Driveshaft {
+    log4cxx::LoggerPtr MainLogger(log4cxx::Logger::getLogger("testing-main"));
+    log4cxx::LoggerPtr ThreadLogger(log4cxx::Logger::getLogger("testing-thread"));
+
+    std::atomic_bool g_force_shutdown(false);
+
+    uint32_t MAX_JOB_RUNNING_TIME = 5;
+    uint32_t GEARMAND_RESPONSE_TIMEOUT = 5;
+}
+
+void configureLoggersForTesting(const boost::program_options::variables_map &options) {
+    auto testMainLogger = log4cxx::Logger::getLogger("testing-main");
+    auto testThreadLogger = log4cxx::Logger::getLogger("testing-thread");
+    log4cxx::LevelPtr currentLevel(testMainLogger->getLevel());
+    log4cxx::LevelPtr targetLevel(log4cxx::Level::getOff());
+
+    if (options.count("verbose")) {
+        auto consoleAppender = new log4cxx::ConsoleAppender(
+                log4cxx::LayoutPtr(new log4cxx::SimpleLayout())
+                );
+
+        testMainLogger->addAppender(consoleAppender);
+        testThreadLogger->addAppender(consoleAppender);
+        targetLevel = currentLevel;
+    }
+
+    testMainLogger->setLevel(targetLevel);
+    testThreadLogger->setLevel(targetLevel);
+}
+
+boost::program_options::variables_map parseCommandLine(int argc, char **argv) {
+    namespace po = boost::program_options;
+    po::options_description desc("Allowed options");
+    desc.add_options()("verbose,v", "dump log output to console");
+
+    po::variables_map options;
+    po::store(po::parse_command_line(argc, argv, desc), options);
+    po::notify(options);
+    return options;
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    auto options(parseCommandLine(argc, argv));
+    configureLoggersForTesting(options);
+    return RUN_ALL_TESTS();
 }

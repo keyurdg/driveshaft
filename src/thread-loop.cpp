@@ -30,16 +30,14 @@ namespace Driveshaft {
 
 ThreadLoop::ThreadLoop(ThreadRegistryPtr registry,
                        const std::string& pool,
-                       const StringSet& server_list,
-                       const StringSet& jobs_list,
-                       const std::string& http_uri) noexcept
-                       : m_registry(registry)
-                       , m_pool(pool)
-                       , m_server_list(server_list)
-                       , m_jobs_list(jobs_list)
-                       , m_http_uri(http_uri) {
+                       GearmanClient *client) noexcept :
+                       m_registry(registry),
+                       m_pool(pool),
+                       m_client(client) {
     LOG4CXX_DEBUG(ThreadLogger, "Starting ThreadLoop for " << m_pool);
-    m_registry->registerThread(m_pool, std::this_thread::get_id());
+    std::thread::id tid(std::this_thread::get_id());
+    m_registry->registerThread(m_pool, tid);
+    m_registry->setThreadState(tid, std::string("Waiting for work"));
 }
 
 ThreadLoop::~ThreadLoop() noexcept {
@@ -57,8 +55,6 @@ void ThreadLoop::run(uint32_t attempts) noexcept {
     }
 
     try {
-        GearmanClient gearclient(m_registry, m_server_list, m_jobs_list, m_http_uri);
-
         while (true) {
             // First check if we should shutdown
             if (g_force_shutdown || m_registry->shouldShutdown(std::this_thread::get_id())) {
@@ -67,7 +63,7 @@ void ThreadLoop::run(uint32_t attempts) noexcept {
             }
 
             // Do real work
-            gearclient.run();
+            m_client->run();
         }
     } catch (GearmanClientException& e) {
         LOG4CXX_ERROR(ThreadLogger, "Caught GearmanClientException: " << e.what() << ". Retriable: " << e.retriable());
