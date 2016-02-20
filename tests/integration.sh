@@ -39,7 +39,7 @@ this_dir=$(pwd)
 popd > /dev/null
 driveshaft_home=$(dirname $this_dir)
 gearmand_bin=${GEARMAND_BIN:-gearmand}
-driveshaft_bin=${DRIVESHAFT_BIN:-$driveshaft_home/src/driveshaft}
+driveshaft_bin=${DRIVESHAFT_BIN:-$driveshaft_home/bin/driveshaft}
 gearmand_port=47301
 httpd_port=47302
 driveshaft_status_port=47303

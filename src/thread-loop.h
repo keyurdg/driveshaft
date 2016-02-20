@@ -37,14 +37,14 @@
 
 namespace Driveshaft {
 
+class GearmanClient;
+
 class ThreadLoop {
 
 public:
     ThreadLoop(ThreadRegistryPtr registry,
                const std::string& pool,
-               const StringSet& server_list,
-               const StringSet& jobs_list,
-               const std::string& http_uri) noexcept;
+               GearmanClient *client) noexcept;
     ~ThreadLoop() noexcept;
     void run(uint32_t attempts) noexcept;
 
@@ -57,9 +57,7 @@ private:
 
     ThreadRegistryPtr m_registry;
     const std::string& m_pool;
-    const StringSet& m_server_list;
-    const StringSet& m_jobs_list;
-    const std::string& m_http_uri;
+    std::unique_ptr<GearmanClient> m_client;
 };
 
 } // namespace Driveshaft

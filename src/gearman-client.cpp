@@ -32,8 +32,26 @@
 
 namespace Driveshaft {
 
-extern "C" {
-static void* worker_callback(gearman_job_st *job, void *context,
+class StringstreamWriter : public Writer {
+public:
+    StringstreamWriter() {
+        // enable exception semantics
+        this->stream.exceptions(std::ios::failbit);
+    }
+
+    size_t write(const char *str, size_t len) {
+        this->stream.write(str, len);
+        return len;
+    }
+
+    std::string str() {
+        return this->stream.str();
+    }
+private:
+    std::stringstream stream;
+};
+
+void* worker_callback(gearman_job_st *job, void *context,
                       size_t *result_size,
                       gearman_return_t *ret_ptr) noexcept {
     LOG4CXX_DEBUG(ThreadLogger, "Starting worker callback");
@@ -53,13 +71,13 @@ static void* worker_callback(gearman_job_st *job, void *context,
 }
 
 /* return of 0 means the write failed and curl will abort the transfer */
-static size_t curl_write_callback(char *ptr, size_t size, size_t nmemb, void *userdata) noexcept {
+size_t curl_write_func(char *ptr, size_t size, size_t nmemb, void *userdata) noexcept {
     LOG4CXX_DEBUG(ThreadLogger, "Starting curl write callback");
-    std::stringstream *write_to = (std::stringstream *) userdata;
+    Writer *stream = static_cast<Writer*>(userdata);
     size_t len = size*nmemb;
     try {
-        write_to->write(ptr, len);
-    } catch (std::exception& e) {
+        stream->write(ptr, len);
+    } catch (const std::exception &e) {
         return 0;
     }
 
@@ -67,7 +85,7 @@ static size_t curl_write_callback(char *ptr, size_t size, size_t nmemb, void *us
 }
 
 /* return of 1 means failure and curl will abort the transfer */
-static int curl_progress_callback(void *p, double dltotal, double dlnow,
+int curl_progress_func(void *p, double dltotal, double dlnow,
                                   double ultotal, double ulnow) noexcept {
     LOG4CXX_DEBUG(ThreadLogger, "Starting curl progress callback");
     time_t cur_time = time(nullptr);
@@ -83,8 +101,6 @@ static int curl_progress_callback(void *p, double dltotal, double dlnow,
     }
 
     return 0;
-}
-
 }
 
 void gearman_client_deleter(gearman_worker_st *ptr) noexcept {
@@ -123,7 +139,6 @@ GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server
     m_json_parser.reset(jsonfactory.newCharReader());
 
     m_state = State::GRAB_JOB;
-    m_registry->setThreadState(std::this_thread::get_id(), std::string("Waiting for work"));
 }
 
 gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string& return_string) noexcept {
@@ -135,7 +150,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     struct curl_slist *headerlist = nullptr;
     gearman_return_t gearman_ret = GEARMAN_SUCCESS;
     time_t start_ts = time(nullptr);
-    std::stringstream raw_resp;
+    StringstreamWriter raw_resp;
     const char *job_function_name = static_cast<const char *>(gearman_job_function_name(job_ptr));
     const char *job_handle = static_cast<const char *>(gearman_job_handle(job_ptr));
     const char *job_unique = static_cast<const char *>(gearman_job_unique(job_ptr));
@@ -184,7 +199,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         LOG4CXX_ERROR(ThreadLogger, "Unable to set URL");
         goto error;
     }
-    if (curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION , &curl_write_callback) != 0) {
+    if (curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION , &curl_write_func) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to set write function");
         goto error;
     }
@@ -196,7 +211,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         LOG4CXX_ERROR(ThreadLogger, "Unable to set noprogress");
         goto error;
     }
-    if (curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, &curl_progress_callback) != 0) {
+    if (curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, &curl_progress_func) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to set progress function");
         goto error;
     }
@@ -264,7 +279,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         std::string parse_errors;
 
         if (!m_json_parser->parse(resp_begin, resp_end, &tree, &parse_errors)) {
-            LOG4CXX_ERROR(ThreadLogger, "Failed to parse response. Raw response: " << raw_resp << " Errors: " << parse_errors);
+            LOG4CXX_ERROR(ThreadLogger, "Failed to parse response. Raw response: " << raw_resp_str << " Errors: " << parse_errors);
             goto error;
         }
 

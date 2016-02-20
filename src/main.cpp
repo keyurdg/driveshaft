@@ -55,7 +55,7 @@ static const char* THREAD_LOGGER_NAME = "Thread";
 static const char* STATUS_LOGGER_NAME = "Status";
 
 /* Define the externs from common-defs */
-std::atomic_bool g_force_shutdown;
+std::atomic_bool g_force_shutdown(false);
 log4cxx::LoggerPtr MainLogger(log4cxx::Logger::getLogger(MAIN_LOGGER_NAME));
 log4cxx::LoggerPtr ThreadLogger(log4cxx::Logger::getLogger(THREAD_LOGGER_NAME));
 log4cxx::LoggerPtr StatusLogger(log4cxx::Logger::getLogger(STATUS_LOGGER_NAME));
@@ -197,7 +197,6 @@ int main(int argc, char **argv) {
     }
 
     /* Global init */
-    Driveshaft::g_force_shutdown = false;
     curl_global_init(CURL_GLOBAL_ALL);
 
     /* Enter main loop */
@@ -206,7 +205,7 @@ int main(int argc, char **argv) {
         LOG4CXX_INFO(Driveshaft::MainLogger, "Starting up with gearmand response timeout=" << Driveshaft::GEARMAND_RESPONSE_TIMEOUT
                                              << " and max running time=" << Driveshaft::MAX_JOB_RUNNING_TIME);
 
-        Driveshaft::MainLoopImpl loop(jobs_config_file);
+        Driveshaft::MainLoop loop(jobs_config_file);
         loop.run();
     } catch (std::exception& e) {
         std::cout << "MainLoop threw exception: " << e.what() << std::endl;

@@ -35,10 +35,23 @@
 
 namespace Driveshaft {
 
+void* worker_callback(gearman_job_st *job, void *context,
+                      size_t *result_size,
+                      gearman_return_t *ret_ptr) noexcept;
+size_t curl_write_func(char *ptr, size_t size, size_t nmemb, void *userdata) noexcept;
+int curl_progress_func(void *p, double dltotal, double dlnow,
+                                  double ultotal, double ulnow) noexcept;
+
 void gearman_client_deleter(gearman_worker_st *ptr) noexcept;
 
-class GearmanClient {
+class Writer {
+public:
+    // throws on failure
+    virtual size_t write(const char *str, size_t len) = 0;
+    virtual std::string str() = 0;
+};
 
+class GearmanClient {
 public:
     GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, const StringSet& jobs_list, const std::string& http_uri);
     ~GearmanClient() = default;
