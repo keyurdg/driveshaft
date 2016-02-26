@@ -11,32 +11,33 @@ namespace Driveshaft {
 
 class PoolWatcher {
 public:
-    virtual void inform(uint32_t config_worker_count, const std::string &pool_name,
-                        const StringSet &server_list, const StringSet &jobs_list,
-                        const std::string &procesing_uri) = 0;
+    virtual ~PoolWatcher() = default;
+    virtual void inform(uint32_t config_worker_count, const std::string& pool_name,
+                        const StringSet& server_list, const StringSet& jobs_list,
+                        const std::string& procesing_uri) = 0;
 };
 
 class DriveshaftConfig {
 public:
     DriveshaftConfig() noexcept;
 
-    bool load(const std::string &config_filename, Json::CharReader::Factory &parser_factory);
-    bool parseConfig(const std::string &config_data, Json::CharReader::Factory &parser_factory);
+    bool load(const std::string& config_filename, std::shared_ptr<Json::CharReader> json_parser);
+    bool parseConfig(const std::string& config_data, std::shared_ptr<Json::CharReader> json_parser);
 
-    void supersede(DriveshaftConfig &old, PoolWatcher &watcher) const;
+    void supersede(DriveshaftConfig& old, PoolWatcher& watcher) const;
 
-    void clearWorkerCount(const std::string &pool_name, PoolWatcher &watcher);
-    void clearAllWorkerCounts(PoolWatcher &watcher);
+    void clearWorkerCount(const std::string& pool_name, PoolWatcher& watcher);
+    void clearAllWorkerCounts(PoolWatcher& watcher);
 
-    std::pair<StringSet, StringSet> compare(const DriveshaftConfig &that) const noexcept;
+    std::pair<StringSet, StringSet> compare(const DriveshaftConfig& that) const noexcept;
 
 private:
-    void parseServerList(const Json::Value &node);
-    void parsePoolList(const Json::Value &node);
+    void parseServerList(const Json::Value& node);
+    void parsePoolList(const Json::Value& node);
 
-    bool needsConfigUpdate(const std::string &new_config_filename) const;
-    std::string fetchFileContents(const std::string &filename) const;
-    bool validateConfigNode(const Json::Value &node) const;
+    bool needsConfigUpdate(const std::string& new_config_filename) const;
+    std::string fetchFileContents(const std::string& filename) const;
+    bool validateConfigNode(const Json::Value& node) const;
 
     typedef struct {
         uint32_t worker_count;

@@ -29,7 +29,9 @@
 #include <string>
 #include <set>
 #include <atomic>
+#include <memory>
 #include <log4cxx/logger.h>
+#include <snyder/metrics_registry.h>
 
 namespace Driveshaft {
 
@@ -39,6 +41,8 @@ extern std::atomic_bool g_force_shutdown;
 extern log4cxx::LoggerPtr MainLogger;
 extern log4cxx::LoggerPtr ThreadLogger;
 extern log4cxx::LoggerPtr StatusLogger;
+
+extern std::shared_ptr<Snyder::MetricsRegistry> MetricsRegistry;
 
 extern uint32_t STATUS_PORT;
 extern uint32_t MAX_JOB_RUNNING_TIME; // Expressed in seconds

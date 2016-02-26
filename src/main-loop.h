@@ -59,6 +59,7 @@ private:
     std::string m_config_filename;
     DriveshaftConfig m_config;
     ThreadRegistryPtr m_thread_registry;
+    std::shared_ptr<PoolWatcher> m_pool_watcher;
 };
 
 } // namespace Driveshaft

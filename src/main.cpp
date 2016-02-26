@@ -56,7 +56,7 @@ static const char* THREAD_LOGGER_NAME = "Thread";
 static const char* STATUS_LOGGER_NAME = "Status";
 
 // globally accesible metrics registry
-Snyder::MetricsRegistry* MetricsRegistry = new Snyder::MetricsRegistry();
+std::shared_ptr<Snyder::MetricsRegistry> MetricsRegistry(new Snyder::MetricsRegistry);
 
 /* Define the externs from common-defs */
 std::atomic_bool g_force_shutdown(false);

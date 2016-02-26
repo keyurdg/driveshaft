@@ -105,17 +105,17 @@ private:
             } else if (!input.compare(STATUS_COMMAND_COUNTERS)
                 || !input.compare(STATUS_COMMAND_COUNTERS_CR)) {
 
-              LOG4CXX_DEBUG(StatusLogger, "Getting counters snapshot and sending it back.");
-              auto counters = Driveshaft::MetricsRegistry->GetCounters();
-              for (auto& kv : counters) {
+              LOG4CXX_DEBUG(StatusLogger, "Getting counters snapshot and sending it back");
+              const auto counters = Driveshaft::MetricsRegistry->GetCounters();
+              for (const auto& kv : counters) {
                     os << kv.first << ": " << kv.second << std::endl;
               }
             } else if (!input.compare(STATUS_COMMAND_GAUGES)
                 || !input.compare(STATUS_COMMAND_GAUGES_CR)) {
 
-              LOG4CXX_DEBUG(StatusLogger, "Getting gauges snapshot and sending it back.");
-              auto gauges = Driveshaft::MetricsRegistry->GetGauges();
-              for (auto& kv : gauges) {
+              LOG4CXX_DEBUG(StatusLogger, "Getting gauges snapshot and sending it back");
+              const auto gauges = Driveshaft::MetricsRegistry->GetGauges();
+              for (const auto& kv : gauges) {
                     os << kv.first << ": " << kv.second << std::endl;
               }
             } else {

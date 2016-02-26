@@ -32,7 +32,6 @@
 #include <errno.h>
 #include <fstream>
 #include <boost/asio.hpp>
-#include <snyder/metrics_registry.h>
 #include <exception>
 #include <utility>
 #include <mutex>
@@ -45,8 +44,6 @@
 #include "gearman-client.h"
 
 namespace Driveshaft {
-
-extern Snyder::MetricsRegistry* MetricsRegistry;
 
 static std::mutex s_new_thread_mutex;
 static std::condition_variable s_new_thread_cond;
@@ -78,9 +75,9 @@ public:
         m_thread_registry(registry) {
     }
 
-    virtual void inform(uint32_t config_worker_count, const std::string &pool_name,
-                        const StringSet &server_list, const StringSet &jobs_list,
-                        const std::string &processing_uri) {
+    virtual void inform(uint32_t config_worker_count, const std::string& pool_name,
+                        const StringSet& server_list, const StringSet& jobs_list,
+                        const std::string& processing_uri) {
         uint32_t current_worker_count = m_thread_registry->poolCount(pool_name);
         if (current_worker_count > config_worker_count) {
             uint32_t num_workers_to_stop = current_worker_count - config_worker_count;
@@ -111,7 +108,8 @@ private:
 MainLoop::MainLoop(const std::string& config_file) :
     m_config_filename(config_file),
     m_config(),
-    m_thread_registry(new ThreadRegistry) {
+    m_thread_registry(new ThreadRegistry),
+    m_pool_watcher(new ThreadPoolWatcher(m_thread_registry)) {
     if (!setupSignals()) {
         throw std::runtime_error("Unable to setup signals");
     }
@@ -138,13 +136,16 @@ static void shutdown_handler(int signal_arg) {
 
 void MainLoop::doShutdown(uint32_t wait) noexcept {
     g_force_shutdown = true;
-    ThreadPoolWatcher tpw(m_thread_registry);
-    this->m_config.clearAllWorkerCounts(tpw);
+    this->m_config.clearAllWorkerCounts(*m_pool_watcher);
     std::this_thread::sleep_for(std::chrono::seconds(wait));
 }
 
 void MainLoop::run() {
     startStatusThread();
+
+    Json::CharReaderBuilder jsonfactory;
+    jsonfactory.strictMode(&jsonfactory.settings_);
+    std::shared_ptr<Json::CharReader> json_parser(jsonfactory.newCharReader());
 
     while(true) {
         switch (shutdown_type) {
@@ -160,13 +161,10 @@ void MainLoop::run() {
             break;
         }
 
-        Json::CharReaderBuilder jsonfactory;
-        jsonfactory.strictMode(&jsonfactory.settings_);
         DriveshaftConfig new_config;
-        new_config.load(this->m_config_filename, jsonfactory);
+        new_config.load(this->m_config_filename, json_parser);
 
-        ThreadPoolWatcher tpw(m_thread_registry);
-        new_config.supersede(m_config, tpw);
+        new_config.supersede(m_config, *m_pool_watcher);
         m_config = new_config;
 
         std::this_thread::sleep_for(std::chrono::seconds(LOOP_SLEEP_DURATION));

@@ -21,7 +21,7 @@ DriveshaftConfig::DriveshaftConfig() noexcept :
     m_load_time(0) {
 }
 
-bool DriveshaftConfig::load(const std::string &config_filename, Json::CharReader::Factory &parser_factory) {
+bool DriveshaftConfig::load(const std::string& config_filename, std::shared_ptr<Json::CharReader> json_parser) {
     if (!this->needsConfigUpdate(config_filename)) {
         return false;
     }
@@ -30,13 +30,12 @@ bool DriveshaftConfig::load(const std::string &config_filename, Json::CharReader
     this->m_config_filename = config_filename;
 
     std::string config_file_contents(this->fetchFileContents(config_filename));
-    return this->parseConfig(config_file_contents, parser_factory);
+    return this->parseConfig(config_file_contents, json_parser);
 }
 
-bool DriveshaftConfig::parseConfig(const std::string &config_data, Json::CharReader::Factory &parser_factory) {
+bool DriveshaftConfig::parseConfig(const std::string& config_data, std::shared_ptr<Json::CharReader> json_parser) {
     Json::Value tree;
     std::string parse_errors;
-    auto json_parser = parser_factory.newCharReader();
     if (!json_parser->parse(config_data.data(),
                             config_data.data() + config_data.length(),
                             &tree, &parse_errors)) {
@@ -59,14 +58,14 @@ bool DriveshaftConfig::parseConfig(const std::string &config_data, Json::CharRea
     return true;
 }
 
-void DriveshaftConfig::supersede(DriveshaftConfig &old, PoolWatcher &watcher) const {
+void DriveshaftConfig::supersede(DriveshaftConfig& old, PoolWatcher& watcher) const {
     StringSet pools_to_shut;
     std::tie(pools_to_shut, std::ignore) = old.compare(*this);
-    for (const auto &pool : pools_to_shut) {
+    for (const auto& pool : pools_to_shut) {
         old.clearWorkerCount(pool, watcher);
     }
 
-    for (auto const &i : this->m_pool_map) {
+    for (auto const& i : this->m_pool_map) {
         const auto &pool_name = i.first;
         const auto &pool_data = i.second;
         watcher.inform(pool_data.worker_count, pool_name, this->m_server_list,
@@ -74,26 +73,26 @@ void DriveshaftConfig::supersede(DriveshaftConfig &old, PoolWatcher &watcher) co
     }
 }
 
-void DriveshaftConfig::clearWorkerCount(const std::string &pool_name, PoolWatcher &watcher) {
+void DriveshaftConfig::clearWorkerCount(const std::string& pool_name, PoolWatcher& watcher) {
     auto pool_iter = this->m_pool_map.find(pool_name);
     if (pool_iter == this->m_pool_map.end()) {
         LOG4CXX_ERROR(MainLogger, "clearWorkerCounts requested, " << pool_name << " does not exist in config");
         throw std::runtime_error("invalid config detected in clearWorkerCounts");
     }
 
-    auto &pool_data = pool_iter->second;
+    auto& pool_data = pool_iter->second;
     pool_data.worker_count = 0;
     watcher.inform(0, pool_name, this->m_server_list,
                    pool_data.job_list, pool_data.job_processing_uri);
 }
 
-void DriveshaftConfig::clearAllWorkerCounts(PoolWatcher &watcher) {
-    for (const auto &i : this->m_pool_map) {
+void DriveshaftConfig::clearAllWorkerCounts(PoolWatcher& watcher) {
+    for (const auto& i : this->m_pool_map) {
         this->clearWorkerCount(i.first, watcher);
     }
 }
 
-std::pair<StringSet, StringSet> DriveshaftConfig::compare(const DriveshaftConfig &that) const noexcept {
+std::pair<StringSet, StringSet> DriveshaftConfig::compare(const DriveshaftConfig& that) const noexcept {
     LOG4CXX_DEBUG(MainLogger, "Beginning config compare");
 
     StringSet current_pool_names, latest_pool_names;
@@ -127,8 +126,8 @@ std::pair<StringSet, StringSet> DriveshaftConfig::compare(const DriveshaftConfig
                 if (found->second.job_processing_uri != i.second.job_processing_uri) {
                     should_restart = true;
                 } else {
-                    const auto &lhs_jobs_set = i.second.job_list;
-                    const auto &rhs_jobs_set = found->second.job_list;
+                    const auto& lhs_jobs_set = i.second.job_list;
+                    const auto& rhs_jobs_set = found->second.job_list;
                     StringSet diff;
                     std::set_symmetric_difference(lhs_jobs_set.begin(), lhs_jobs_set.end(),
                                                   rhs_jobs_set.begin(), rhs_jobs_set.end(),
@@ -149,25 +148,25 @@ std::pair<StringSet, StringSet> DriveshaftConfig::compare(const DriveshaftConfig
     }
 }
 
-void DriveshaftConfig::parseServerList(const Json::Value &node) {
-    const auto &servers_list = node[cfgkeys::GEARMAN_SERVERS_LIST];
+void DriveshaftConfig::parseServerList(const Json::Value& node) {
+    const auto& servers_list = node[cfgkeys::GEARMAN_SERVERS_LIST];
     for (auto i = servers_list.begin(); i != servers_list.end(); ++i) {
         if (!i->isString()) {
             LOG4CXX_ERROR(MainLogger, cfgkeys::GEARMAN_SERVERS_LIST << " does not contain strings");
             throw std::runtime_error("config server list type failure");
         }
 
-        const auto &name = i->asString();
+        const auto& name = i->asString();
         this->m_server_list.insert(name);
         LOG4CXX_DEBUG(MainLogger, "Read server: " << name);
     }
 }
 
-void DriveshaftConfig::parsePoolList(const Json::Value &node) {
-    const auto &pools_list = node[cfgkeys::POOLS_LIST];
+void DriveshaftConfig::parsePoolList(const Json::Value& node) {
+    const auto& pools_list = node[cfgkeys::POOLS_LIST];
     for (auto i = pools_list.begin(); i != pools_list.end(); ++i) {
-        const auto &pool_name = i.name();
-        const auto &pool_node = *i;
+        const auto& pool_name = i.name();
+        const auto& pool_node = *i;
 
         if (!pool_node.isMember(cfgkeys::POOL_WORKER_COUNT) ||
             !pool_node.isMember(cfgkeys::POOL_JOB_LIST) ||
@@ -187,7 +186,7 @@ void DriveshaftConfig::parsePoolList(const Json::Value &node) {
             throw std::runtime_error("config jobs list parse failure");
         }
 
-        auto &pool_data = this->m_pool_map[pool_name];
+        auto& pool_data = this->m_pool_map[pool_name];
         pool_data.worker_count = pool_node[cfgkeys::POOL_WORKER_COUNT].asUInt();
         pool_data.job_processing_uri = pool_node[cfgkeys::POOL_JOB_PROCESSING_URI].asString();
         LOG4CXX_DEBUG(
@@ -196,27 +195,28 @@ void DriveshaftConfig::parsePoolList(const Json::Value &node) {
             pool_data.worker_count << " and URI " << pool_data.job_processing_uri
         );
 
-        const auto &job_list = pool_node[cfgkeys::POOL_JOB_LIST];
+        const auto& job_list = pool_node[cfgkeys::POOL_JOB_LIST];
         for (auto j = job_list.begin(); j != job_list.end(); ++j) {
             if (!j->isString()) {
                 LOG4CXX_ERROR(MainLogger, cfgkeys::POOL_JOB_LIST << " does not contain strings");
             }
 
-            const auto &name = j->asString();
+            const auto& name = j->asString();
             pool_data.job_list.insert(name);
             LOG4CXX_DEBUG(MainLogger, "Pool " << pool_name << " adding job " << name);
         }
     }
 }
 
-bool DriveshaftConfig::needsConfigUpdate(const std::string &new_config_filename) const {
+bool DriveshaftConfig::needsConfigUpdate(const std::string& new_config_filename) const {
     boost::filesystem::path config_path(new_config_filename);
-    std::time_t modified_time = boost::filesystem::last_write_time(config_path);
-    if (modified_time == (std::time_t)(-1)) {
+    boost::system::error_code ec;
+    std::time_t modified_time = boost::filesystem::last_write_time(config_path, ec);
+    if (ec) {
         LOG4CXX_ERROR(
             MainLogger,
             "Unable to ascertain config mtime " << new_config_filename <<
-            ". Error: " << std::to_string(errno)
+            ". Error: " << ec.message()
         );
         throw std::runtime_error("config stat failure");
     }
@@ -224,7 +224,7 @@ bool DriveshaftConfig::needsConfigUpdate(const std::string &new_config_filename)
     return modified_time > this->m_load_time;
 }
 
-std::string DriveshaftConfig::fetchFileContents(const std::string &filename) const {
+std::string DriveshaftConfig::fetchFileContents(const std::string& filename) const {
     std::ifstream config_filestream(filename, std::ios::in | std::ios::binary);
     if (config_filestream.fail()) {
         LOG4CXX_ERROR(MainLogger, "Unable to load file " << filename);
@@ -237,7 +237,7 @@ std::string DriveshaftConfig::fetchFileContents(const std::string &filename) con
     return contents.str();
 }
 
-bool DriveshaftConfig::validateConfigNode(const Json::Value &node) const {
+bool DriveshaftConfig::validateConfigNode(const Json::Value& node) const {
     using namespace cfgkeys;
     if (!node.isMember(GEARMAN_SERVERS_LIST) ||
         !node.isMember(POOLS_LIST)) {

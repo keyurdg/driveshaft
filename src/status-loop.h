@@ -32,8 +32,6 @@
 
 namespace Driveshaft {
 
-  extern Snyder::MetricsRegistry* MetricsRegistry;
-
 class StatusLoop {
 
 public:

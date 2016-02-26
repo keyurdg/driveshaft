@@ -25,13 +25,19 @@ public:
 
 class DriveshaftConfigTest : public ::testing::Test {
 public:
+    DriveshaftConfigTest() : watcher(), json_parser(NULL) {
+        Json::CharReaderBuilder jsonfactory;
+        jsonfactory.strictMode(&jsonfactory.settings_);
+        json_parser.reset(jsonfactory.newCharReader());
+    }
+
     TestPoolWatcher watcher;
-    Json::CharReaderBuilder jsonFactory;
+    std::shared_ptr<Json::CharReader> json_parser;
 };
 
 TEST_F(DriveshaftConfigTest, TestClearWorkerCount) {
     DriveshaftConfig config;
-    config.parseConfig(testConfigOneServerOnePool, jsonFactory);
+    config.parseConfig(testConfigOneServerOnePool, json_parser);
     std::string poolToClear("test-pool-1");
     config.clearWorkerCount(poolToClear, watcher);
 
@@ -42,7 +48,7 @@ TEST_F(DriveshaftConfigTest, TestClearWorkerCount) {
 
 TEST_F(DriveshaftConfigTest, TestClearAllWorkerCounts) {
     DriveshaftConfig config;
-    config.parseConfig(testConfigOneServerTwoPools, jsonFactory);
+    config.parseConfig(testConfigOneServerTwoPools, json_parser);
 
     TestPoolWatcher watcher;
     config.clearAllWorkerCounts(watcher);
@@ -58,8 +64,8 @@ TEST_F(DriveshaftConfigTest, TestClearAllWorkerCounts) {
 
 TEST_F(DriveshaftConfigTest, TestCompareInvalidatesAllPoolsOnServerListChange) {
     DriveshaftConfig oldconf, newconf;
-    oldconf.parseConfig(testConfigOneServerTwoPools, jsonFactory);
-    newconf.parseConfig(testConfigTwoServersTwoPools, jsonFactory);
+    oldconf.parseConfig(testConfigOneServerTwoPools, json_parser);
+    newconf.parseConfig(testConfigTwoServersTwoPools, json_parser);
 
     StringSet toRemove, toAdd;
     std::tie(toRemove, toAdd) = oldconf.compare(newconf);
@@ -76,8 +82,8 @@ TEST_F(DriveshaftConfigTest, TestCompareInvalidatesAllPoolsOnServerListChange) {
 
 TEST_F(DriveshaftConfigTest, TestCompareAddsPoolOnConfigChange) {
     DriveshaftConfig oldconf, newconf;
-    oldconf.parseConfig(testConfigOneServerOnePool, jsonFactory);
-    newconf.parseConfig(testConfigOneServerTwoPools, jsonFactory);
+    oldconf.parseConfig(testConfigOneServerOnePool, json_parser);
+    newconf.parseConfig(testConfigOneServerTwoPools, json_parser);
 
     StringSet toRemove, toAdd;
     std::tie(toRemove, toAdd) = oldconf.compare(newconf);
@@ -90,8 +96,8 @@ TEST_F(DriveshaftConfigTest, TestCompareAddsPoolOnConfigChange) {
 
 TEST_F(DriveshaftConfigTest, TestCompareInvalidateRemovesPoolOnConfigChange) {
     DriveshaftConfig oldconf, newconf;
-    oldconf.parseConfig(testConfigOneServerTwoPools, jsonFactory);
-    newconf.parseConfig(testConfigOneServerOnePool, jsonFactory);
+    oldconf.parseConfig(testConfigOneServerTwoPools, json_parser);
+    newconf.parseConfig(testConfigOneServerOnePool, json_parser);
 
     StringSet toRemove, toAdd;
     std::tie(toRemove, toAdd) = oldconf.compare(newconf);
@@ -104,8 +110,8 @@ TEST_F(DriveshaftConfigTest, TestCompareInvalidateRemovesPoolOnConfigChange) {
 
 TEST_F(DriveshaftConfigTest, TestCompareInvalidatesOnProcessingUriChange) {
     DriveshaftConfig oldconf, newconf;
-    oldconf.parseConfig(testConfigOneServerOnePool, jsonFactory);
-    newconf.parseConfig(testConfigOneServerOnePoolNewUri, jsonFactory);
+    oldconf.parseConfig(testConfigOneServerOnePool, json_parser);
+    newconf.parseConfig(testConfigOneServerOnePoolNewUri, json_parser);
 
     StringSet toRemove, toAdd;
     std::tie(toRemove, toAdd) = oldconf.compare(newconf);
@@ -120,8 +126,8 @@ TEST_F(DriveshaftConfigTest, TestCompareInvalidatesOnProcessingUriChange) {
 
 TEST_F(DriveshaftConfigTest, TestSupersedeNotifiesPoolWatcher) {
     DriveshaftConfig oldconf, newconf;
-    oldconf.parseConfig(testConfigOneServerOnePool, jsonFactory);
-    newconf.parseConfig(testConfigOneServerOnePoolNewUri, jsonFactory);
+    oldconf.parseConfig(testConfigOneServerOnePool, json_parser);
+    newconf.parseConfig(testConfigOneServerOnePoolNewUri, json_parser);
 
     TestPoolWatcher watcher;
     newconf.supersede(oldconf, watcher);
