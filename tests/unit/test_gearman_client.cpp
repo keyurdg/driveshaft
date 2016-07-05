@@ -670,4 +670,5 @@ TEST_F(GearmanClientTest, TestProgressCallbackSuccessOnNormalTimeBound) {
 TEST_F(GearmanClientTest, TestSetSockOptOnBadFd) {
     int ret = curl_set_sockopt(nullptr, -1, CURLSOCKTYPE_LAST);
     ASSERT_EQ(CURL_SOCKOPT_ERROR, ret);
+    ASSERT_EQ(EBADF, errno);
 }
