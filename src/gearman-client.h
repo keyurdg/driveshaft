@@ -32,6 +32,7 @@
 #include "common-defs.h"
 #include "thread-registry.h"
 #include "dist/json/json.h"
+#include <curl/curl.h>
 
 namespace Driveshaft {
 
@@ -40,7 +41,8 @@ void* worker_callback(gearman_job_st *job, void *context,
                       gearman_return_t *ret_ptr) noexcept;
 size_t curl_write_func(char *ptr, size_t size, size_t nmemb, void *userdata) noexcept;
 int curl_progress_func(void *p, double dltotal, double dlnow,
-                                  double ultotal, double ulnow) noexcept;
+                       double ultotal, double ulnow) noexcept;
+int curl_set_sockopt(void *unused1, curl_socket_t curlfd, curlsocktype unused2) noexcept;
 
 void gearman_client_deleter(gearman_worker_st *ptr) noexcept;
 

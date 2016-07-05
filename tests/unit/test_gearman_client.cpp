@@ -473,6 +473,10 @@ TEST_F(GearmanClientTest, TestProcessJobReturnsGearmanErrorOnFailedFormAdd) {
     ASSERT_TRUE(mockCurlLib.allCleanupRoutinesCalled());
 }
 
+/* This also tests failure to setsockopt(SO_REUSEADDR).
+ * Per https://curl.haxx.se/libcurl/c/CURLOPT_SOCKOPTFUNCTION.html, CURL_SOCKOPT_ERROR
+ * from the callback is returned to perform as CURLE_COULDNT_CONNECT
+ */
 TEST_F(GearmanClientTest, TestProcessJobReturnsGearmanErrorOnFailedPerform) {
     mockCurlLib.configure(CURLE_OK, CURLE_COULDNT_CONNECT, CURLE_OK, CURL_FORMADD_OK);
 
@@ -661,4 +665,9 @@ TEST_F(GearmanClientTest, TestProgressCallbackSuccessOnNormalTimeBound) {
     time_t startTime(time(nullptr));
     int ret = curl_progress_func(&startTime, 0.0, 0.0, 0.0, 0.0);
     ASSERT_EQ(0, ret);
+}
+
+TEST_F(GearmanClientTest, TestSetSockOptOnBadFd) {
+    int ret = curl_set_sockopt(nullptr, -1, CURLSOCKTYPE_LAST);
+    ASSERT_EQ(CURL_SOCKOPT_ERROR, ret);
 }

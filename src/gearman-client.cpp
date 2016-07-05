@@ -84,6 +84,17 @@ size_t curl_write_func(char *ptr, size_t size, size_t nmemb, void *userdata) noe
     return len;
 }
 
+/* return of CURL_SOCKOPT_ERROR means failure and curl will abort the transfer */
+int curl_set_sockopt(void *dummy1, curl_socket_t curlfd, curlsocktype dummy2) noexcept {
+    int data = 1;
+    if (setsockopt(curlfd, SOL_SOCKET, SO_REUSEADDR, &data, sizeof(data)) != 0) {
+        LOG4CXX_ERROR(ThreadLogger, "Unable to set SO_REUSEADDR. errno: " << errno);
+        return CURL_SOCKOPT_ERROR;
+    }
+
+    return CURL_SOCKOPT_OK;
+}
+
 /* return of 1 means failure and curl will abort the transfer */
 int curl_progress_func(void *p, double dltotal, double dlnow,
                                   double ultotal, double ulnow) noexcept {
@@ -179,6 +190,10 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     }
     if (curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to set tcp_nodelay");
+        goto error;
+    }
+    if (curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, curl_set_sockopt) != 0) {
+        LOG4CXX_ERROR(ThreadLogger, "Unable to set sockoptfunction");
         goto error;
     }
 #ifdef HAVE_CURLOPT_TCP_KEEPALIVE
