@@ -210,9 +210,21 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         goto error;
     }
 #endif
-    if (curl_easy_setopt(curl, CURLOPT_URL, m_http_uri.c_str()) != 0) {
-        LOG4CXX_ERROR(ThreadLogger, "Unable to set URL");
-        goto error;
+    {
+        // contains URL + job name as GET parameter
+        // we use stack memory to avoid throwing std::bad_alloc at runtime
+        const size_t DEBUG_URL_MAX_SIZE = 2048;
+        char FULL_DEBUG_URL[DEBUG_URL_MAX_SIZE] = {0};
+
+        snprintf(FULL_DEBUG_URL, DEBUG_URL_MAX_SIZE, "%s?name=%s", m_http_uri.c_str(), job_function_name);
+
+        // fall back to the original URI if it's longer than our debug string
+        const char* POST_URL = m_http_uri.size() > FULL_DEBUG_URL ? m_http_uri.c_str() : FULL_DEBUG_URL;
+
+        if (curl_easy_setopt(curl, CURLOPT_URL, POST_URL) != 0) {
+            LOG4CXX_ERROR(ThreadLogger, "Unable to set URL");
+            goto error;
+        }
     }
     if (curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION , &curl_write_func) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to set write function");
