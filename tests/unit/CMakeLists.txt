@@ -14,6 +14,7 @@ target_link_libraries(
     driveshaft
     gtest
     log4cxx
+    network-uri 
     ${Boost_LIBRARIES}
 )
 
