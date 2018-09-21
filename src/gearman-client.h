@@ -33,6 +33,7 @@
 #include "thread-registry.h"
 #include "dist/json/json.h"
 #include <curl/curl.h>
+#include <network/uri.hpp>
 
 namespace Driveshaft {
 
@@ -69,7 +70,7 @@ private:
     GearmanClient& operator=(const GearmanClient&&) = delete;
 
     ThreadRegistryPtr m_registry;
-    const std::string& m_http_uri;
+    const network::uri m_http_uri;
     std::unique_ptr<gearman_worker_st, decltype(&gearman_client_deleter)> m_worker_ptr;
     std::unique_ptr<Json::CharReader> m_json_parser;
     enum class State {

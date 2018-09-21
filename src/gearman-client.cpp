@@ -121,7 +121,7 @@ void gearman_client_deleter(gearman_worker_st *ptr) noexcept {
 
 GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, const StringSet& jobs_list, const std::string& uri)
                              : m_registry(registry)
-                             , m_http_uri(uri)
+                             , m_http_uri(network::uri(uri))
                              , m_worker_ptr(gearman_worker_create(nullptr), gearman_client_deleter)
                              , m_json_parser(nullptr)
                              , m_state(State::INIT) {
@@ -169,6 +169,10 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     char error_buf[CURL_ERROR_SIZE];
     error_buf[0] = 0;
 
+    network::uri_builder uri_builder(m_http_uri);
+    const char* http_uri_with_job = uri_builder.uri().string().c_str();
+    uri_builder.append_query_key_value_pair("job_name", job_function_name);
+
     // The blank Expect header is to solve the issue described here: http://devblog.songkick.com/2012/11/27/a-second-here-a-second-there/
     // The cURL documentation also recommends it in their examples: http://curl.haxx.se/libcurl/c/postit2.html
     static const char expect_buf[] = "Expect:";
@@ -210,7 +214,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         goto error;
     }
 #endif
-    if (curl_easy_setopt(curl, CURLOPT_URL, m_http_uri.c_str()) != 0) {
+    if (curl_easy_setopt(curl, CURLOPT_URL, http_uri_with_job) != 0) {
         LOG4CXX_ERROR(ThreadLogger, "Unable to set URL");
         goto error;
     }
