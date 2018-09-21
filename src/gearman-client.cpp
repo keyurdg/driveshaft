@@ -170,8 +170,8 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     error_buf[0] = 0;
 
     network::uri_builder uri_builder(m_http_uri);
-    const char* http_uri_with_job = uri_builder.uri().string().c_str();
     uri_builder.append_query_key_value_pair("job_name", job_function_name);
+    const char* http_uri_with_job = uri_builder.uri().string().c_str();
 
     // The blank Expect header is to solve the issue described here: http://devblog.songkick.com/2012/11/27/a-second-here-a-second-there/
     // The cURL documentation also recommends it in their examples: http://curl.haxx.se/libcurl/c/postit2.html
