@@ -12,7 +12,6 @@
 * libcurl(-devel)
 * boost(-devel) 1.48 or later
 * gcc 4.8 or later
-* [snyder](https://github.com/mrtazz/snyder) 0.4.0 or later for metrics
 
 ## Build
 ```

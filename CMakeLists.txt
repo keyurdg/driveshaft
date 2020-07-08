@@ -23,7 +23,6 @@ include(FindCurl)
 include(FindGearman)
 include(GetBoost)
 include(FindLog4cxx)
-include(FindSnyder)
 include(CheckFunctionExists)
 include(GNUInstallDirs) # use GNU install dirs (e.g. lib64 instead of lib)
 

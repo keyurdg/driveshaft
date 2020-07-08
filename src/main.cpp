@@ -43,7 +43,6 @@
 #include <log4cxx/propertyconfigurator.h>
 #include <log4cxx/xml/domconfigurator.h>
 #include <log4cxx/helpers/exception.h>
-#include <snyder/metrics_registry.h>
 #include "common-defs.h"
 #include "main-loop.h"
 #include "version.h"
@@ -55,15 +54,10 @@ static const char* MAIN_LOGGER_NAME = "Main";
 static const char* THREAD_LOGGER_NAME = "Thread";
 static const char* STATUS_LOGGER_NAME = "Status";
 
-// globally accesible metrics registry
-std::shared_ptr<Snyder::MetricsRegistry> MetricsRegistry(new Snyder::MetricsRegistry);
-
 /* Define the externs from common-defs */
 std::atomic_bool g_force_shutdown(false);
 log4cxx::LoggerPtr MainLogger(log4cxx::Logger::getLogger(MAIN_LOGGER_NAME));
 log4cxx::LoggerPtr ThreadLogger(log4cxx::Logger::getLogger(THREAD_LOGGER_NAME));
-log4cxx::LoggerPtr StatusLogger(log4cxx::Logger::getLogger(STATUS_LOGGER_NAME));
-uint32_t STATUS_PORT;
 uint32_t MAX_JOB_RUNNING_TIME;
 uint32_t GEARMAND_RESPONSE_TIMEOUT; // This drives all the other timeouts below
 uint32_t LOOP_SLEEP_DURATION;
@@ -145,7 +139,6 @@ int main(int argc, char **argv) {
             ("logconfig", po::value<std::string>(&log_config_file)->required(), "log config file path")
             ("max_running_time", po::value<uint32_t>(&Driveshaft::MAX_JOB_RUNNING_TIME)->required(), "how long can a job run before it is considered failed (in seconds)")
             ("loop_timeout", po::value<uint32_t>(&Driveshaft::GEARMAND_RESPONSE_TIMEOUT)->required(), "how long to wait for a response from gearmand before restarting event-loop (in seconds)")
-            ("status_port", po::value<uint32_t>(&Driveshaft::STATUS_PORT)->required(), "port to listen on to return status")
     ;
 
     try {

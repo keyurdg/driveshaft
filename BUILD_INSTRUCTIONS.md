@@ -21,13 +21,10 @@ sudo apt-get install build-essential \
 
 ### Compilation
 
-First, you'll need to compile and install [Snyder](https://github.com/mrtazz/snyder)
+First, you'll need to compile and install [PrometheusC++](https://github.com/jupp0r/prometheus-cpp)
 
 ```bash
-git clone https://github.com/mrtazz/snyder
-cd snyder
-./autogen.sh
-./configure
+FIX THIS
 make install
 ```
 
