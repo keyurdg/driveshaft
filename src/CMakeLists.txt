@@ -3,7 +3,6 @@ set(
     ./driveshaft-config.cpp
     ./gearman-client.cpp
     ./main-loop.cpp
-    ./status-loop.cpp
     ./thread-loop.cpp
     ./thread-registry.cpp
     ./pidfile.cpp

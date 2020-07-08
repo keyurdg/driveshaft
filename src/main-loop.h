@@ -45,7 +45,6 @@ public:
     ~MainLoop() = default;
 
 private:
-    void startStatusThread();
     bool setupSignals() const noexcept;
     void doShutdown(uint32_t wait) noexcept;
     void checkRunningConfigAndRegistry() noexcept;
