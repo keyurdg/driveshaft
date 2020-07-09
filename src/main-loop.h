@@ -47,7 +47,6 @@ public:
 private:
     bool setupSignals() const noexcept;
     void doShutdown(uint32_t wait) noexcept;
-    void checkRunningConfigAndRegistry() noexcept;
 
     MainLoop() = delete;
     MainLoop(const MainLoop&) = delete;

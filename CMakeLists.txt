@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.7 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 
 # includes
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
@@ -18,7 +18,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 include(Compiler)
-include(FindPThread)
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+include(FindThreads)
+list(APPEND DRIVESHAFT_LINK_LIBRARIES Threads::Threads)
 include(FindCurl)
 include(FindGearman)
 include(GetBoost)
