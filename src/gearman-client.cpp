@@ -119,8 +119,10 @@ void gearman_client_deleter(gearman_worker_st *ptr) noexcept {
     gearman_worker_free(ptr);
 }
 
-GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, const StringSet& jobs_list, const std::string& uri)
+GearmanClient::GearmanClient(ThreadRegistryPtr registry, MetricProxyPtr metrics, const StringSet &server_list,
+                             const StringSet &jobs_list, const std::string &uri)
                              : m_registry(registry)
+                             , m_metrics(metrics)
                              , m_http_uri(uri)
                              , m_worker_ptr(gearman_worker_create(nullptr), gearman_client_deleter)
                              , m_json_parser(nullptr)
@@ -307,6 +309,11 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         // the Json interface needs a default, so here goes...
         gearman_ret = (gearman_return_t)(tree["gearman_ret"].asInt());
         return_string.append(tree["response_string"].asString());
+
+        time_t done_ts = time(nullptr);
+        double duration = difftime(done_ts, start_ts);
+
+        m_metrics->reportJobSuccess("pool", job_function_name, 0);
 
         LOG4CXX_INFO(ThreadLogger, "Finished job: function=" << job_function_name << " handle=" << job_handle << " unique=" << job_unique
                                    << " workload=" << job_workload

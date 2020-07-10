@@ -23,45 +23,20 @@
  *
  */
 
-#ifndef incl_DRIVESHAFT_MAIN_LOOP_H_
-#define incl_DRIVESHAFT_MAIN_LOOP_H_
-
-#include <string>
-#include <map>
-#include <utility>
-#include <time.h>
-#include "common-defs.h"
-#include "thread-registry.h"
 #include "metric-proxy.h"
-#include "driveshaft-config.h"
 
 namespace Driveshaft {
 
-class MainLoop {
-public:
-    // treat this class as a singleton. you really, really don't want more
-    // than one in your process.
-    MainLoop(const std::string& config_file);
-    void run();
-    ~MainLoop() = default;
+MetricProxy::MetricProxy() noexcept {
+    LOG4CXX_DEBUG(MainLogger, "Starting metric proxy");
+}
 
-private:
-    bool setupSignals() const noexcept;
-    void doShutdown(uint32_t wait) noexcept;
+MetricProxy::~MetricProxy() noexcept {
 
-    MainLoop() = delete;
-    MainLoop(const MainLoop&) = delete;
-    MainLoop(MainLoop&&) = delete;
-    MainLoop& operator=(const MainLoop&) = delete;
-    MainLoop& operator=(const MainLoop&&) = delete;
+}
 
-    std::string m_config_filename;
-    DriveshaftConfig m_config;
-    ThreadRegistryPtr m_thread_registry;
-    MetricProxyPtr m_metric_proxy;
-    std::shared_ptr<PoolWatcher> m_pool_watcher;
-};
+void
+MetricProxy::reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept {
+}
 
-} // namespace Driveshaft
-
-#endif // incl_DRIVESHAFT_MAIN_REGISTRY_H_
+}

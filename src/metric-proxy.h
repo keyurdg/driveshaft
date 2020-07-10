@@ -23,45 +23,42 @@
  *
  */
 
-#ifndef incl_DRIVESHAFT_MAIN_LOOP_H_
-#define incl_DRIVESHAFT_MAIN_LOOP_H_
+#ifndef incl_DRIVESHAFT_METRIC_PROXY_H_
+#define incl_DRIVESHAFT_METRIC_PROXY_H_
 
-#include <string>
-#include <map>
-#include <utility>
-#include <time.h>
+// #include <string>
+// #include <map>
+// #include <set>
+// #include <thread>
+// #include <memory>
+// #include <mutex>
 #include "common-defs.h"
-#include "thread-registry.h"
-#include "metric-proxy.h"
-#include "driveshaft-config.h"
 
 namespace Driveshaft {
 
-class MainLoop {
+class MetricProxyInterface {
 public:
-    // treat this class as a singleton. you really, really don't want more
-    // than one in your process.
-    MainLoop(const std::string& config_file);
-    void run();
-    ~MainLoop() = default;
+    virtual ~MetricProxyInterface() noexcept {}
 
-private:
-    bool setupSignals() const noexcept;
-    void doShutdown(uint32_t wait) noexcept;
-
-    MainLoop() = delete;
-    MainLoop(const MainLoop&) = delete;
-    MainLoop(MainLoop&&) = delete;
-    MainLoop& operator=(const MainLoop&) = delete;
-    MainLoop& operator=(const MainLoop&&) = delete;
-
-    std::string m_config_filename;
-    DriveshaftConfig m_config;
-    ThreadRegistryPtr m_thread_registry;
-    MetricProxyPtr m_metric_proxy;
-    std::shared_ptr<PoolWatcher> m_pool_watcher;
+    virtual void
+    reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept = 0;
 };
 
-} // namespace Driveshaft
+class MetricProxy : public MetricProxyInterface {
+public:
+    MetricProxy() noexcept;
+    ~MetricProxy() noexcept;
 
-#endif // incl_DRIVESHAFT_MAIN_REGISTRY_H_
+    void reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept;
+
+private:
+    MetricProxy(const MetricProxy&) = delete;
+    MetricProxy(MetricProxy&&) = delete;
+    MetricProxy& operator=(const MetricProxy&) = delete;
+    MetricProxy& operator=(const MetricProxy&&) = delete;
+};
+
+typedef std::shared_ptr<MetricProxyInterface> MetricProxyPtr;
+}
+
+#endif // incl_DRIVESHAFT_METRIC_PROXY_H_

@@ -7,7 +7,7 @@ set(
     ./thread-registry.cpp
     ./pidfile.cpp
     ./dist/jsoncpp.cpp
-)
+        metric-proxy.cpp metric-proxy.h)
 
 add_library(driveshaft ${driveshaft_lib_sources})
 add_executable(driveshaft-bin ./main.cpp)

@@ -31,6 +31,7 @@
 #include <libgearman-1.0/gearman.h>
 #include "common-defs.h"
 #include "thread-registry.h"
+#include "metric-proxy.h"
 #include "dist/json/json.h"
 #include <curl/curl.h>
 
@@ -55,7 +56,8 @@ public:
 
 class GearmanClient {
 public:
-    GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, const StringSet& jobs_list, const std::string& http_uri);
+    GearmanClient(ThreadRegistryPtr registry, MetricProxyPtr metrics, const StringSet &server_list,
+                  const StringSet &jobs_list, const std::string &uri);
     ~GearmanClient() = default;
 
     void run();
@@ -69,6 +71,7 @@ private:
     GearmanClient& operator=(const GearmanClient&&) = delete;
 
     ThreadRegistryPtr m_registry;
+    MetricProxyPtr m_metrics;
     const std::string& m_http_uri;
     std::unique_ptr<gearman_worker_st, decltype(&gearman_client_deleter)> m_worker_ptr;
     std::unique_ptr<Json::CharReader> m_json_parser;
