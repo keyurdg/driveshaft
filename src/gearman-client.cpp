@@ -119,7 +119,7 @@ void gearman_client_deleter(gearman_worker_st *ptr) noexcept {
     gearman_worker_free(ptr);
 }
 
-GearmanClient::GearmanClient(ThreadRegistryPtr registry, MetricProxyPtr metrics, const StringSet &server_list,
+GearmanClient::GearmanClient(ThreadRegistryPtr registry, MetricProxyPoolWrapperPtr metrics, const StringSet &server_list,
                              const StringSet &jobs_list, const std::string &uri)
                              : m_registry(registry)
                              , m_metrics(metrics)
@@ -154,6 +154,10 @@ GearmanClient::GearmanClient(ThreadRegistryPtr registry, MetricProxyPtr metrics,
     m_state = State::GRAB_JOB;
 }
 
+using std::chrono::high_resolution_clock;
+using std::chrono::duration;
+using std::chrono::duration_cast;
+
 gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string& return_string) noexcept {
     CURL *curl;
     CURLcode curlrc;
@@ -162,6 +166,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     struct curl_httppost *lastptr = nullptr;
     struct curl_slist *headerlist = nullptr;
     gearman_return_t gearman_ret = GEARMAN_SUCCESS;
+    high_resolution_clock::time_point hrc_start = std::chrono::high_resolution_clock::now();
     time_t start_ts = time(nullptr);
     StringstreamWriter raw_resp;
     const char *job_function_name = static_cast<const char *>(gearman_job_function_name(job_ptr));
@@ -310,10 +315,9 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         gearman_ret = (gearman_return_t)(tree["gearman_ret"].asInt());
         return_string.append(tree["response_string"].asString());
 
-        time_t done_ts = time(nullptr);
-        double duration = difftime(done_ts, start_ts);
-
-        m_metrics->reportJobSuccess("pool", job_function_name, 0);
+        high_resolution_clock::time_point hrc_done = high_resolution_clock::now();
+        duration<double> delay = duration_cast<duration<double>>(hrc_done - hrc_start);
+        m_metrics->reportJobSuccess(job_function_name, delay.count());
 
         LOG4CXX_INFO(ThreadLogger, "Finished job: function=" << job_function_name << " handle=" << job_handle << " unique=" << job_unique
                                    << " workload=" << job_workload

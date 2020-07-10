@@ -26,12 +26,11 @@
 #ifndef incl_DRIVESHAFT_METRIC_PROXY_H_
 #define incl_DRIVESHAFT_METRIC_PROXY_H_
 
-// #include <string>
-// #include <map>
-// #include <set>
-// #include <thread>
-// #include <memory>
-// #include <mutex>
+#include <string>
+#include <prometheus/exposer.h>
+#include <prometheus/registry.h>
+#include <prometheus/histogram.h>
+
 #include "common-defs.h"
 
 namespace Driveshaft {
@@ -40,8 +39,7 @@ class MetricProxyInterface {
 public:
     virtual ~MetricProxyInterface() noexcept {}
 
-    virtual void
-    reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept = 0;
+    virtual void reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept = 0;
 };
 
 class MetricProxy : public MetricProxyInterface {
@@ -52,13 +50,49 @@ public:
     void reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept;
 
 private:
+    // Disable copying
     MetricProxy(const MetricProxy&) = delete;
     MetricProxy(MetricProxy&&) = delete;
     MetricProxy& operator=(const MetricProxy&) = delete;
     MetricProxy& operator=(const MetricProxy&&) = delete;
+
+    prometheus::Exposer m_exporter;
+    std::shared_ptr<prometheus::Registry> m_registry;
+
+    prometheus::Family<prometheus::Histogram> &m_family = prometheus::BuildHistogram()
+            .Name("metric")
+            .Help("help string")
+            .Labels({{"label", "value"}})
+            .Register(*m_registry);
 };
 
 typedef std::shared_ptr<MetricProxyInterface> MetricProxyPtr;
+
+class MetricProxyPoolWrapper;
+typedef std::shared_ptr<MetricProxyPoolWrapper> MetricProxyPoolWrapperPtr;
+
+class MetricProxyPoolWrapper {
+public:
+    static MetricProxyPoolWrapperPtr wrap(const std::string pool_name, MetricProxyPtr metrics) {
+        return MetricProxyPoolWrapperPtr(new MetricProxyPoolWrapper(pool_name, metrics));
+    }
+
+    void reportJobSuccess(const std::string &function_name, double duration) noexcept {
+        m_metric_proxy->reportJobSuccess(m_pool_name, function_name, duration);
+    }
+
+private:
+    const std::string m_pool_name;
+    MetricProxyPtr m_metric_proxy;
+
+    MetricProxyPoolWrapper(const std::string pool_name, MetricProxyPtr metrics) noexcept
+        : m_pool_name(pool_name)
+        , m_metric_proxy(metrics) {
+    }
+
+};
+
+
 }
 
 #endif // incl_DRIVESHAFT_METRIC_PROXY_H_

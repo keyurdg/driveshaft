@@ -24,11 +24,24 @@
  */
 
 #include "metric-proxy.h"
+#include <prometheus/histogram.h>
 
 namespace Driveshaft {
 
-MetricProxy::MetricProxy() noexcept {
+MetricProxy::MetricProxy() noexcept
+    // create an http server running on port 8888
+    : m_exporter{"0.0.0.0:8888"}
+    , m_registry(new prometheus::Registry()) {
     LOG4CXX_DEBUG(MainLogger, "Starting metric proxy");
+
+//    prometheus::Family<prometheus::Histogram> &family = prometheus::BuildHistogram()
+//            .Name("metric")
+//            .Help("help string")
+//            .Labels({{"label", "value"}})
+//            .Register(*m_registry);
+
+    m_exporter.RegisterCollectable(m_registry);
+
 }
 
 MetricProxy::~MetricProxy() noexcept {
@@ -37,6 +50,10 @@ MetricProxy::~MetricProxy() noexcept {
 
 void
 MetricProxy::reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept {
+    auto& metric = m_family.Add({{"pool", pool_name},
+                               {"function", function_name}}, prometheus::Histogram::BucketBoundaries{0.1, 1, 10, 100, 1000});
+
+    metric.Observe(duration);
 }
 
 }

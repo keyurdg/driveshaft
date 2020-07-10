@@ -60,7 +60,8 @@ static void gearman_thread_delegate(ThreadRegistryPtr registry,
                             StringSet jobs_list,
                             std::string http_uri) noexcept {
     std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-    GearmanClient *client = new GearmanClient(registry, metrics, servers_list,
+    const MetricProxyPoolWrapperPtr metricsPoolWrapper = MetricProxyPoolWrapper::wrap(pool, metrics);
+    GearmanClient *client = new GearmanClient(registry, metricsPoolWrapper, servers_list,
                                               jobs_list, http_uri);
     ThreadLoop loop(registry, pool, client);
     s_new_thread_wakeup = ThreadStartState::SUCCESS;

@@ -218,9 +218,13 @@ public:
     ConfigurableMockGearmanWorkerLib mockGearmanWorkerLib;
     ThreadRegistryPtr mockThreadRegistry;
     MockMetricProxyPtr mockMetricProxy;
+    MetricProxyPoolWrapperPtr mockMetricProxyPoolWrapper;
+
 
     GearmanClientTest() : mockThreadRegistry(new mock::classes::MockThreadRegistry),
-        mockMetricProxy(new mock::classes::MockMetricProxy) {}
+                          mockMetricProxy(new mock::classes::MockMetricProxy) {
+        mockMetricProxyPoolWrapper = MetricProxyPoolWrapper::wrap("testcase_pool_name", mockMetricProxy);
+    }
 
     void SetUp() {
         mockCurlLib.reset();
@@ -244,7 +248,7 @@ TEST_F(GearmanClientTest, TestGearmanClientThrowsOnBadServerList) {
     bool caught = false;
     try {
         std::unique_ptr<GearmanClient>(
-            new GearmanClient(mockThreadRegistry, mockMetricProxy, servers, StringSet(), "")
+            new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, servers, StringSet(), "")
         );
     } catch (const GearmanClientException &e) {
         caught = true;
@@ -265,7 +269,7 @@ TEST_F(GearmanClientTest, TestGearmanClientThrowsOnBadJobsList) {
     bool caught = false;
     try {
         std::unique_ptr<GearmanClient>(
-            new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), jobs, "")
+            new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), jobs, "")
         );
     } catch (const GearmanClientException &e) {
         caught = true;
@@ -281,7 +285,7 @@ TEST_F(GearmanClientTest, TestRunPollsOnWaitOrNoJobs) {
     );
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     try {
@@ -297,7 +301,7 @@ TEST_F(GearmanClientTest, TestRunPollsOnWaitOrNoJobs) {
     );
 
     client.reset(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     try {
@@ -314,7 +318,7 @@ TEST_F(GearmanClientTest, TestRunThrowsOnTimeoutOrNotConnected) {
     );
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     bool caught = false;
@@ -334,7 +338,7 @@ TEST_F(GearmanClientTest, TestRunThrowsOnTimeoutOrNotConnected) {
     );
 
     client.reset(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     try {
@@ -353,7 +357,7 @@ TEST_F(GearmanClientTest, TestRunThrowsOnUnknownWorkReturn) {
     );
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     bool caught = false;
@@ -373,7 +377,7 @@ TEST_F(GearmanClientTest, TestRunInPollStateGrabsNextJobOnSuccess) {
     );
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     try {
@@ -389,7 +393,7 @@ TEST_F(GearmanClientTest, TestRunInPollStateReturnsOnTimeout) {
     );
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     client->run();
@@ -403,7 +407,7 @@ TEST_F(GearmanClientTest, TestRunInPollStateThrowsOnNoFds) {
     );
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     bool caught = false;
@@ -423,7 +427,7 @@ TEST_F(GearmanClientTest, TestRunInPollStateThrowsOnUnkownReturn) {
     );
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     bool caught = false;
@@ -441,7 +445,7 @@ TEST_F(GearmanClientTest, TestProcessJobReturnsGearmanErrorOnFailedInit) {
     mockCurlLib.configureInit(nullptr);
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     std::string gearmanRet;
@@ -454,7 +458,7 @@ TEST_F(GearmanClientTest, TestProcessJobReturnsGearmanErrorOnFailedSetOpt) {
     mockCurlLib.configure(CURLE_FAILED_INIT, CURLE_OK, CURLE_OK, CURL_FORMADD_OK);
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     std::string gearmanRet;
@@ -467,7 +471,7 @@ TEST_F(GearmanClientTest, TestProcessJobReturnsGearmanErrorOnFailedFormAdd) {
     mockCurlLib.configure(CURLE_OK, CURLE_OK, CURLE_OK, CURL_FORMADD_MEMORY);
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     std::string gearmanRet;
@@ -484,7 +488,7 @@ TEST_F(GearmanClientTest, TestProcessJobReturnsGearmanErrorOnFailedPerform) {
     mockCurlLib.configure(CURLE_OK, CURLE_COULDNT_CONNECT, CURLE_OK, CURL_FORMADD_OK);
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     std::string gearmanRet;
@@ -500,7 +504,7 @@ TEST_F(GearmanClientTest, TestProcessJobReturnsGearmanErrorOnNon200Response) {
     mockCurlLib.configureGetInfo(CURLINFO_RESPONSE_CODE, &serverError);
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     std::string gearmanRet;
@@ -523,7 +527,7 @@ TEST_F(GearmanClientTest, TestProcessJobReturnsGearmanErrorOnResponseParseFailur
     mockCurlLib.configureSetOpt(CURLOPT_WRITEDATA, writeFunc);
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     std::string gearmanRet;
@@ -546,7 +550,7 @@ TEST_F(GearmanClientTest, TestProcessJobReturnsGearmanErrorOnInvalidResponseStru
     };
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     for (auto badResponse : badResponses) {
@@ -585,7 +589,7 @@ TEST_F(GearmanClientTest, TestWorkerCallbackProcessesJob) {
     mockCurlLib.configureSetOpt(CURLOPT_WRITEDATA, writeFunc);
 
     std::unique_ptr<GearmanClient> client(
-        new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+        new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     size_t outSize(0);
@@ -644,7 +648,10 @@ TEST_F(GearmanClientTest, TestSetSockOptOnBadFd) {
 }
 
 
-TEST_F(GearmanClientTest, TestProcessJobDelayMetricOnSuccess) {
+TEST_F(GearmanClientTest, TestProcessJobDelayMetricOnSuccess)
+{
+    static const double TEST_SLEEP_DURATION_SECONDS = 0.123;
+
     mockCurlLib.configure(CURLE_OK, CURLE_OK, CURLE_OK, CURL_FORMADD_OK);
 
     long ok(200);
@@ -658,6 +665,7 @@ TEST_F(GearmanClientTest, TestProcessJobDelayMetricOnSuccess) {
 
     std::string goodResponse(goodResponseStream.str());
     auto writeFunc = [goodResponse] (void *userData) {
+        usleep(TEST_SLEEP_DURATION_SECONDS * 1000000);
         curl_write_func(
                 const_cast<char*>(goodResponse.c_str()), goodResponse.length(),
                 1, userData
@@ -667,12 +675,15 @@ TEST_F(GearmanClientTest, TestProcessJobDelayMetricOnSuccess) {
     mockCurlLib.configureSetOpt(CURLOPT_WRITEDATA, writeFunc);
 
     std::unique_ptr<GearmanClient> client(
-            new GearmanClient(mockThreadRegistry, mockMetricProxy, StringSet(), StringSet(), "")
+            new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
     );
 
     std::string gearmanReturnValue;
-    gearman_return_t expectedSuccess = client->processJob(nullptr, gearmanReturnValue);
+    client->processJob(nullptr, gearmanReturnValue);
 
-    ASSERT_EQ(1, mockMetricProxy->getCountJobSuccessesReported("pool", "mocked_function_name"));
-    ASSERT_EQ(0, mockMetricProxy->getCountJobSuccessesReported("pool", "unknown_function_name"));
+    EXPECT_EQ(mockMetricProxy->getJobSuccessesCount("testcase_pool_name", "mocked_function_name"), 1);
+    EXPECT_EQ(mockMetricProxy->getJobSuccessesCount("testcase_pool_name", "unknown_function_name"), 0);
+
+    double jobSuccessesDelaySum = mockMetricProxy->getJobSuccessesDelaySum("testcase_pool_name", "mocked_function_name");
+    EXPECT_GE(jobSuccessesDelaySum, TEST_SLEEP_DURATION_SECONDS);
 }
