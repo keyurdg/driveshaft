@@ -288,6 +288,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
         if (http_code != 200) {
             LOG4CXX_ERROR(ThreadLogger, "Invalid HTTP response code. Expecting 200, got " << http_code);
+            m_metrics->reportJobError(job_function_name, http_code);
             goto error;
         }
     }

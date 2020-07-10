@@ -10,9 +10,16 @@ class MockMetricProxy : public Driveshaft::MetricProxyInterface {
 public:
     MockMetricProxy() noexcept 
         : m_job_successes_count()
-        , m_job_successes_delay_sum() {
+        , m_job_successes_delay_sum()
+        , m_job_error_count() {
     }
     ~MockMetricProxy() noexcept {}
+
+    void reset() {
+        m_job_successes_count.clear();
+        m_job_successes_delay_sum.clear();
+        m_job_error_count.clear();
+    }
 
     /* Implementation of the MetricProxyInterface */
     void reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept {
@@ -23,6 +30,12 @@ public:
         m_job_successes_delay_sum[key] += duration;
     }
 
+    void reportJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept {
+        std::tuple<std::string, std::string, uint16_t> key = std::make_tuple(pool_name, function_name, http_status);
+        m_job_error_count[key] += 1;
+    }
+
+
     /* Here on below, an interface for validation from test cases */
     uint32_t getJobSuccessesCount(const std::string& pool_name, const std::string& function_name) {
         return m_job_successes_count[std::make_pair(pool_name, function_name)];
@@ -32,9 +45,17 @@ public:
         return m_job_successes_delay_sum[std::make_pair(pool_name, function_name)];
     }
 
+    uint32_t getJobErrorCount(const std::string& pool_name, const std::string& function_name, uint16_t http_status) {
+        std::tuple<std::string, std::string, uint16_t> key = std::make_tuple(pool_name, function_name, http_status);
+        return m_job_error_count[key];
+    }
+
+
 private:
     std::map<std::pair<std::string,std::string>, uint32_t> m_job_successes_count;
     std::map<std::pair<std::string,std::string>, double> m_job_successes_delay_sum;
+
+    std::map<std::tuple<std::string, std::string, uint16_t>, uint32_t> m_job_error_count;
 };
 
 } // namespace classes

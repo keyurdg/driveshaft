@@ -40,14 +40,16 @@ public:
     virtual ~MetricProxyInterface() noexcept {}
 
     virtual void reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept = 0;
+    virtual void reportJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept = 0;
 };
 
 class MetricProxy : public MetricProxyInterface {
 public:
-    MetricProxy() noexcept;
+    MetricProxy(const char *metricAddress) noexcept;
     ~MetricProxy() noexcept;
 
     void reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept;
+    void reportJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept;
 
 private:
     // Disable copying
@@ -59,10 +61,19 @@ private:
     prometheus::Exposer m_exporter;
     std::shared_ptr<prometheus::Registry> m_registry;
 
-    prometheus::Family<prometheus::Histogram> &m_family = prometheus::BuildHistogram()
-            .Name("metric")
-            .Help("help string")
-            .Labels({{"label", "value"}})
+    const prometheus::Histogram::BucketBoundaries m_job_duration_bucket_boundaries =
+            prometheus::Histogram::BucketBoundaries{0.01, 0.1, 1, 10, 100, 1000};
+
+    prometheus::Family<prometheus::Histogram> &m_job_duration_family = prometheus::BuildHistogram()
+            .Name("driveshaft_job_duration")
+            .Help("histogram of the execution time of successful jobs run by driveshaft")
+            .Labels({})
+            .Register(*m_registry);
+
+    prometheus::Family<prometheus::Counter> &m_errors_family = prometheus::BuildCounter()
+            .Name("driveshaft_errors")
+            .Help("http errors returned when calling a job")
+            .Labels({})
             .Register(*m_registry);
 };
 
@@ -79,6 +90,10 @@ public:
 
     void reportJobSuccess(const std::string &function_name, double duration) noexcept {
         m_metric_proxy->reportJobSuccess(m_pool_name, function_name, duration);
+    }
+
+    void reportJobError(const std::string &function_name, uint16_t http_status) noexcept {
+        m_metric_proxy->reportJobError(m_pool_name, function_name, http_status);
     }
 
 private:

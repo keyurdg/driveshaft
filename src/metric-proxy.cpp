@@ -28,32 +28,33 @@
 
 namespace Driveshaft {
 
-MetricProxy::MetricProxy() noexcept
-    // create an http server running on port 8888
-    : m_exporter{"0.0.0.0:8888"}
+MetricProxy::MetricProxy(const char *metricAddress) noexcept
+    : m_exporter{metricAddress} // ←-- starts the exporter
     , m_registry(new prometheus::Registry()) {
-    LOG4CXX_DEBUG(MainLogger, "Starting metric proxy");
-
-//    prometheus::Family<prometheus::Histogram> &family = prometheus::BuildHistogram()
-//            .Name("metric")
-//            .Help("help string")
-//            .Labels({{"label", "value"}})
-//            .Register(*m_registry);
-
+    LOG4CXX_DEBUG(MainLogger, "Started metric exporter on " << metricAddress);
     m_exporter.RegisterCollectable(m_registry);
-
 }
 
 MetricProxy::~MetricProxy() noexcept {
-
 }
 
 void
 MetricProxy::reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept {
-    auto& metric = m_family.Add({{"pool", pool_name},
-                               {"function", function_name}}, prometheus::Histogram::BucketBoundaries{0.1, 1, 10, 100, 1000});
+    auto& metric = m_job_duration_family.Add({{"pool",     pool_name},
+                                              {"function", function_name}},
+                                              m_job_duration_bucket_boundaries);
 
     metric.Observe(duration);
 }
+
+void
+MetricProxy::reportJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept {
+    const std::string &http_status_str = std::to_string(http_status);
+    auto& counter = m_errors_family.Add({{"pool",     pool_name},
+                                         {"function", function_name},
+                                         {"http_status", http_status_str}});
+    counter.Increment();
+}
+
 
 }

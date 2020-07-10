@@ -52,7 +52,6 @@ namespace Driveshaft {
 
 static const char* MAIN_LOGGER_NAME = "Main";
 static const char* THREAD_LOGGER_NAME = "Thread";
-static const char* STATUS_LOGGER_NAME = "Status";
 
 /* Define the externs from common-defs */
 std::atomic_bool g_force_shutdown(false);

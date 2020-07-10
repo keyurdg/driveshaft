@@ -114,7 +114,7 @@ MainLoop::MainLoop(const std::string& config_file) :
     m_config_filename(config_file),
     m_config(),
     m_thread_registry(new ThreadRegistry),
-    m_metric_proxy(new MetricProxy),
+    m_metric_proxy(new MetricProxy("0.0.0.0:8888")),
     m_pool_watcher(new ThreadPoolWatcher(m_thread_registry, m_metric_proxy)) {
     if (!setupSignals()) {
         throw std::runtime_error("Unable to setup signals");

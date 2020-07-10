@@ -231,6 +231,7 @@ public:
         mockGearmanWorkerLib.reset();
         initMockCurlLib(&mockCurlLib);
         initMockGearmanLibs(&mockGearmanJobLib, &mockGearmanWorkerLib);
+        mockMetricProxy->reset();
     }
 };
 
@@ -686,4 +687,24 @@ TEST_F(GearmanClientTest, TestProcessJobDelayMetricOnSuccess)
 
     double jobSuccessesDelaySum = mockMetricProxy->getJobSuccessesDelaySum("testcase_pool_name", "mocked_function_name");
     EXPECT_GE(jobSuccessesDelaySum, TEST_SLEEP_DURATION_SECONDS);
+}
+
+TEST_F(GearmanClientTest, TestProcessErrorMetricOn500Response) {
+    mockCurlLib.configure(CURLE_OK, CURLE_OK, CURLE_OK, CURL_FORMADD_OK);
+
+    long serverError(500);
+    mockCurlLib.configureGetInfo(CURLINFO_RESPONSE_CODE, &serverError);
+
+    std::unique_ptr<GearmanClient> client(
+            new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
+    );
+
+    std::string gearmanRet;
+    client->processJob(nullptr, gearmanRet);
+
+    // Not successful, no success metric should be reported
+    EXPECT_EQ(mockMetricProxy->getJobSuccessesCount("testcase_pool_name", "mocked_function_name"), 0);
+
+    // Expect an error to have been recorded
+    EXPECT_EQ(mockMetricProxy->getJobErrorCount("testcase_pool_name", "mocked_function_name", 500), 1);
 }
