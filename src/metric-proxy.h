@@ -37,27 +37,31 @@ namespace Driveshaft {
 
 class MetricProxyInterface {
 public:
-    virtual ~MetricProxyInterface() noexcept {}
+    virtual ~MetricProxyInterface() noexcept = default;
 
     virtual void reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept = 0;
-    virtual void reportJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept = 0;
+    virtual void reportHttpJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept = 0;
+    virtual void reportJobTimeout(const std::string &pool_name, const std::string &function_name) noexcept = 0;
+    virtual void reportJobError(const std::string &pool_name, const std::string &function_name) noexcept = 0;
 };
 
 class MetricProxy : public MetricProxyInterface {
 public:
-    MetricProxy(const char *metricAddress) noexcept;
-    ~MetricProxy() noexcept;
+    explicit MetricProxy(const char *metricAddress) noexcept;
+    ~MetricProxy() noexcept override;
 
-    void reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept;
-    void reportJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept;
+    void reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept override;
+    void reportHttpJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept override;
+    void reportJobTimeout(const std::string &pool_name, const std::string &function_name) noexcept override;
+    void reportJobError(const std::string &pool_name, const std::string &function_name) noexcept override;
 
-private:
     // Disable copying
     MetricProxy(const MetricProxy&) = delete;
     MetricProxy(MetricProxy&&) = delete;
     MetricProxy& operator=(const MetricProxy&) = delete;
     MetricProxy& operator=(const MetricProxy&&) = delete;
 
+private:
     prometheus::Exposer m_exporter;
     std::shared_ptr<prometheus::Registry> m_registry;
 
@@ -70,11 +74,24 @@ private:
             .Labels({})
             .Register(*m_registry);
 
-    prometheus::Family<prometheus::Counter> &m_errors_family = prometheus::BuildCounter()
-            .Name("driveshaft_errors")
+    prometheus::Family<prometheus::Counter> &m_http_errors_family = prometheus::BuildCounter()
+            .Name("driveshaft_http_errors")
             .Help("http errors returned when calling a job")
             .Labels({})
             .Register(*m_registry);
+
+    prometheus::Family<prometheus::Counter> &m_timeouts_family = prometheus::BuildCounter()
+            .Name("driveshaft_timeouts")
+            .Help("http errors returned when calling a job")
+            .Labels({})
+            .Register(*m_registry);
+
+    prometheus::Family<prometheus::Counter> &m_errors_family = prometheus::BuildCounter()
+            .Name("driveshaft_errors")
+            .Help("error when processing a job, includes driveshaft_http_errors and driveshaft_timeouts")
+            .Labels({})
+            .Register(*m_registry);
+
 };
 
 typedef std::shared_ptr<MetricProxyInterface> MetricProxyPtr;
@@ -92,8 +109,16 @@ public:
         m_metric_proxy->reportJobSuccess(m_pool_name, function_name, duration);
     }
 
-    void reportJobError(const std::string &function_name, uint16_t http_status) noexcept {
-        m_metric_proxy->reportJobError(m_pool_name, function_name, http_status);
+    void reportJobHttpError(const std::string &function_name, uint16_t http_status) noexcept {
+        m_metric_proxy->reportHttpJobError(m_pool_name, function_name, http_status);
+    }
+
+    virtual void reportJobTimeout(const std::string &function_name) noexcept {
+        m_metric_proxy->reportJobTimeout(m_pool_name, function_name);
+    }
+
+    void reportJobError(const std::string &function_name) noexcept {
+        m_metric_proxy->reportJobError(m_pool_name, function_name);
     }
 
 private:
@@ -104,9 +129,7 @@ private:
         : m_pool_name(pool_name)
         , m_metric_proxy(metrics) {
     }
-
 };
-
 
 }
 

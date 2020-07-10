@@ -705,6 +705,29 @@ TEST_F(GearmanClientTest, TestProcessErrorMetricOn500Response) {
     // Not successful, no success metric should be reported
     EXPECT_EQ(mockMetricProxy->getJobSuccessesCount("testcase_pool_name", "mocked_function_name"), 0);
 
-    // Expect an error to have been recorded
-    EXPECT_EQ(mockMetricProxy->getJobErrorCount("testcase_pool_name", "mocked_function_name", 500), 1);
+    // Expect the 500 http error to have been recorded
+    EXPECT_EQ(mockMetricProxy->getJobHttpErrorCount("testcase_pool_name", "mocked_function_name", 500), 1);
+
+    // Expect a generic error to have been recorded ( error count includes
+    // all kinds of errors including non-200 http and timeouts captured by other metrics
+    EXPECT_EQ(mockMetricProxy->getJobErrorCount("testcase_pool_name", "mocked_function_name"), 1);
+}
+
+// Timeouts in our case aren't true "curl" timeouts, but happen as a result of a
+// calculation in curl_progress_func comparing the elapsed time to MAX_JOB_RUNNING_TIME
+// When the progress function returns non-zero the main curl returns CURLE_ABORTED_BY_CALLBACK
+// we use the CURLE_ABORTED_BY_CALLBACK return value to signal updating the timeout metric.
+// The timeout is also considered an error and counted in the error metric
+TEST_F(GearmanClientTest, TestProcessErrorMetricOnTimeout) {
+    mockCurlLib.configure(CURLE_OK, CURLE_ABORTED_BY_CALLBACK, CURLE_OK, CURL_FORMADD_OK);
+
+    std::unique_ptr<GearmanClient> client(
+            new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "")
+    );
+
+    std::string gearmanRet;
+    client->processJob(nullptr, gearmanRet);
+
+    EXPECT_EQ(mockMetricProxy->getJobTimeoutCount("testcase_pool_name", "mocked_function_name"), 1);
+    EXPECT_EQ(mockMetricProxy->getJobErrorCount("testcase_pool_name", "mocked_function_name"), 1);
 }

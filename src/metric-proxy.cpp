@@ -40,21 +40,31 @@ MetricProxy::~MetricProxy() noexcept {
 
 void
 MetricProxy::reportJobSuccess(const std::string &pool_name, const std::string &function_name, double duration) noexcept {
-    auto& metric = m_job_duration_family.Add({{"pool",     pool_name},
+    auto& metric = m_job_duration_family.Add({{"pool", pool_name},
                                               {"function", function_name}},
                                               m_job_duration_bucket_boundaries);
-
     metric.Observe(duration);
 }
 
 void
-MetricProxy::reportJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept {
+MetricProxy::reportHttpJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept {
     const std::string &http_status_str = std::to_string(http_status);
-    auto& counter = m_errors_family.Add({{"pool",     pool_name},
-                                         {"function", function_name},
-                                         {"http_status", http_status_str}});
+    auto& counter = m_http_errors_family.Add({{"pool", pool_name},
+                                              {"function", function_name},
+                                              {"http_status", http_status_str}});
     counter.Increment();
 }
 
+void MetricProxy::reportJobTimeout(const std::string &pool_name, const std::string &function_name) noexcept {
+    auto& counter = m_timeouts_family.Add({{"pool", pool_name},
+                                           {"function", function_name}});
+    counter.Increment();
+}
+
+void MetricProxy::reportJobError(const std::string &pool_name, const std::string &function_name) noexcept {
+    auto& counter = m_errors_family.Add({{"pool", pool_name},
+                                         {"function", function_name}});
+    counter.Increment();
+}
 
 }

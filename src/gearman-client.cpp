@@ -281,6 +281,9 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     curlrc = curl_easy_perform(curl);
     if (curlrc != CURLE_OK) {
         LOG4CXX_ERROR(ThreadLogger, "Failed to perform curl. Error: " << curl_easy_strerror(curlrc) << " Message: " << error_buf);
+        if (curlrc == CURLE_ABORTED_BY_CALLBACK) {
+            m_metrics->reportJobTimeout(job_function_name);
+        }
         goto error;
     } else {
         /* check HTTP response code */
@@ -288,7 +291,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
         if (http_code != 200) {
             LOG4CXX_ERROR(ThreadLogger, "Invalid HTTP response code. Expecting 200, got " << http_code);
-            m_metrics->reportJobError(job_function_name, http_code);
+            m_metrics->reportJobHttpError(job_function_name, http_code);
             goto error;
         }
     }
@@ -329,6 +332,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
 
 error:
     gearman_ret = GEARMAN_WORK_FAIL;
+    m_metrics->reportJobError(job_function_name);
 cleanup:
     curl_easy_cleanup(curl);
     curl_formfree(formpost);
