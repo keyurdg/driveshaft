@@ -12,10 +12,10 @@ public:
         : m_job_successes_count()
         , m_job_successes_delay_sum()
         , m_job_http_error_count()
-        , m_job_error_count()
-        , m_job_timeout_count() {
+        , m_job_timeout_count()
+        , m_job_error_count() {
     }
-    ~MockMetricProxy() noexcept {}
+    ~MockMetricProxy() noexcept override = default;
 
     void reset() {
         m_job_successes_count.clear();
@@ -69,6 +69,19 @@ public:
 
     uint32_t getJobErrorCount(const std::string& pool_name, const std::string& function_name) {
         return m_job_error_count[std::make_pair(pool_name, function_name)];
+    }
+
+    void reportThreadStarted(const std::string &pool_name) noexcept override{
+        int i = 0;
+    }
+    void reportThreadEnded(const std::string &pool_name) noexcept override {
+        int i = 0;
+    }
+    void reportThreadStartingWork(const std::string &pool_name, const std::string &function_name) noexcept override {
+        int i = 0;
+    }
+    void reportThreadWorkComplete(const std::string &pool_name, const std::string &function_name) noexcept override {
+        int i = 0;
     }
 
 private:

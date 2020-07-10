@@ -30,6 +30,8 @@
 #include <prometheus/exposer.h>
 #include <prometheus/registry.h>
 #include <prometheus/histogram.h>
+#include <prometheus/gauge.h>
+#include <stack>
 
 #include "common-defs.h"
 
@@ -43,6 +45,11 @@ public:
     virtual void reportHttpJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept = 0;
     virtual void reportJobTimeout(const std::string &pool_name, const std::string &function_name) noexcept = 0;
     virtual void reportJobError(const std::string &pool_name, const std::string &function_name) noexcept = 0;
+
+    virtual void reportThreadStarted(const std::string &pool_name) noexcept = 0;
+    virtual void reportThreadEnded(const std::string &pool_name) noexcept = 0;
+    virtual void reportThreadStartingWork(const std::string &pool_name, const std::string &function_name) noexcept = 0;
+    virtual void reportThreadWorkComplete(const std::string &pool_name, const std::string &function_name) noexcept = 0;
 };
 
 class MetricProxy : public MetricProxyInterface {
@@ -54,6 +61,12 @@ public:
     void reportHttpJobError(const std::string &pool_name, const std::string &function_name, uint16_t http_status) noexcept override;
     void reportJobTimeout(const std::string &pool_name, const std::string &function_name) noexcept override;
     void reportJobError(const std::string &pool_name, const std::string &function_name) noexcept override;
+
+    void reportThreadStarted(const std::string &pool_name) noexcept override;
+    void reportThreadEnded(const std::string &pool_name) noexcept override;
+    void reportThreadStartingWork(const std::string &pool_name, const std::string &function_name) noexcept override;
+    void reportThreadWorkComplete(const std::string &pool_name, const std::string &function_name) noexcept override;
+
 
     // Disable copying
     MetricProxy(const MetricProxy&) = delete;
@@ -92,6 +105,11 @@ private:
             .Labels({})
             .Register(*m_registry);
 
+    prometheus::Family<prometheus::Gauge> &m_threads_family = prometheus::BuildGauge()
+            .Name("driveshaft_threads")
+            .Help("tracks threads by pool and function including their working/idle status")
+            .Labels({})
+            .Register(*m_registry);
 };
 
 typedef std::shared_ptr<MetricProxyInterface> MetricProxyPtr;
@@ -121,13 +139,43 @@ public:
         m_metric_proxy->reportJobError(m_pool_name, function_name);
     }
 
+    void reportThreadStarted() noexcept {
+        m_metric_proxy->reportThreadStarted(m_pool_name);
+    }
+
+    void reportThreadEnded() noexcept {
+        if (m_active_function.empty()) {
+            m_metric_proxy->reportThreadEnded(m_pool_name);
+        } else {
+            std::string &function_name = m_active_function.top();
+            m_metric_proxy->reportThreadWorkComplete(m_pool_name, function_name);
+            m_active_function.pop();
+        }
+    }
+
+    void reportThreadStartingWork(const std::string &function_name) noexcept {
+        m_metric_proxy->reportThreadStartingWork(m_pool_name, function_name);
+        m_active_function.push(function_name);
+    }
+
+    void reportThreadWorkComplete() noexcept {
+        if (m_active_function.empty())
+            return;
+        std::string &function_name = m_active_function.top();
+        m_metric_proxy->reportThreadWorkComplete(m_pool_name, function_name);
+        m_active_function.pop();
+    }
+
 private:
     const std::string m_pool_name;
     MetricProxyPtr m_metric_proxy;
 
+    std::stack<std::string> m_active_function;
+
     MetricProxyPoolWrapper(const std::string pool_name, MetricProxyPtr metrics) noexcept
         : m_pool_name(pool_name)
-        , m_metric_proxy(metrics) {
+        , m_metric_proxy(metrics)
+        , m_active_function() {
     }
 };
 

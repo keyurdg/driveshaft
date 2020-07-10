@@ -24,7 +24,6 @@
  */
 
 #include "metric-proxy.h"
-#include <prometheus/histogram.h>
 
 namespace Driveshaft {
 
@@ -33,6 +32,15 @@ MetricProxy::MetricProxy(const char *metricAddress) noexcept
     , m_registry(new prometheus::Registry()) {
     LOG4CXX_DEBUG(MainLogger, "Started metric exporter on " << metricAddress);
     m_exporter.RegisterCollectable(m_registry);
+
+//    prometheus::Family<prometheus::Counter> &m_errors_family = prometheus::BuildCounter()
+//            .Name("driveshaft_errors")
+//            .Help("error when processing a job, includes driveshaft_http_errors and driveshaft_timeouts")
+//            .Labels({})
+//            .Register(*m_registry);
+
+
+
 }
 
 MetricProxy::~MetricProxy() noexcept {
@@ -65,6 +73,42 @@ void MetricProxy::reportJobError(const std::string &pool_name, const std::string
     auto& counter = m_errors_family.Add({{"pool", pool_name},
                                          {"function", function_name}});
     counter.Increment();
+}
+
+void MetricProxy::reportThreadStartingWork(const std::string &pool_name, const std::string &function_name) noexcept {
+    auto& active = m_threads_family.Add({{"pool", pool_name},
+                                         {"function", function_name},
+                                         {"status", "working"}});
+
+    auto& idle = m_threads_family.Add({{"pool", pool_name},
+                                       {"status", "idle"}});
+
+    active.Increment();
+    idle.Decrement();
+}
+
+void MetricProxy::reportThreadWorkComplete(const std::string &pool_name, const std::string &function_name) noexcept {
+    auto& active = m_threads_family.Add({{"pool", pool_name},
+                                         {"function", function_name},
+                                         {"status", "working"}});
+
+    auto& idle = m_threads_family.Add({{"pool", pool_name},
+                                       {"status", "idle"}});
+
+    active.Decrement();
+    idle.Increment();
+}
+
+void MetricProxy::reportThreadStarted(const std::string &pool_name) noexcept {
+    auto& idle = m_threads_family.Add({{"pool", pool_name},
+                                       {"status", "idle"}});
+    idle.Increment();
+}
+
+void MetricProxy::reportThreadEnded(const std::string &pool_name) noexcept {
+    auto& idle = m_threads_family.Add({{"pool", pool_name},
+                                       {"status", "idle"}});
+    idle.Decrement();
 }
 
 }

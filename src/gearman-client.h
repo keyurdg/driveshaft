@@ -58,7 +58,7 @@ class GearmanClient {
 public:
     GearmanClient(ThreadRegistryPtr registry, std::shared_ptr<MetricProxyPoolWrapper> metrics, const StringSet &server_list,
                   const StringSet &jobs_list, const std::string &uri);
-    ~GearmanClient() = default;
+    virtual ~GearmanClient();
 
     void run();
     gearman_return_t processJob(gearman_job_st *job_ptr, std::string& data) noexcept;

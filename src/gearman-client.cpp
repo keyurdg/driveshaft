@@ -151,7 +151,13 @@ GearmanClient::GearmanClient(ThreadRegistryPtr registry, MetricProxyPoolWrapperP
     jsonfactory.strictMode(&jsonfactory.settings_);
     m_json_parser.reset(jsonfactory.newCharReader());
 
+    m_metrics->reportThreadStarted();
+
     m_state = State::GRAB_JOB;
+}
+
+GearmanClient::~GearmanClient() {
+    m_metrics->reportThreadEnded();
 }
 
 using std::chrono::high_resolution_clock;
@@ -181,6 +187,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     static const char expect_buf[] = "Expect:";
 
     m_registry->setThreadState(std::this_thread::get_id(), std::string().append("job_handle=").append(job_handle).append(" job_unique=").append(job_unique));
+    m_metrics->reportThreadStartingWork(job_function_name);
 
     curl = curl_easy_init();
     if (!curl) {
@@ -364,6 +371,7 @@ void GearmanClient::run() {
                 LOG4CXX_INFO(ThreadLogger, "Job failed with error " << ret);
                 /* fall through */
             case GEARMAN_SUCCESS:
+                m_metrics->reportThreadWorkComplete();
                 m_registry->setThreadState(std::this_thread::get_id(), std::string("Waiting for work"));
                 return; // The caller should decide whether to get more jobs or do other things
 
@@ -410,5 +418,6 @@ void GearmanClient::run() {
         }
     }
 }
+
 
 } // namespace Driveshaft

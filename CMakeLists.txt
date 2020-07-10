@@ -33,7 +33,7 @@ include(GNUInstallDirs) # use GNU install dirs (e.g. lib64 instead of lib)
 mark_as_advanced(CLEAR CMAKE_INSTALL_PREFIX)
 
 ## Uncomment the below to disable optimizations for debugging
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
 add_subdirectory(src bin/)
 
