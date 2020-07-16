@@ -16,10 +16,12 @@ public:
         waitCalled(false),
         timesWorkCalled(0),
         timesWaitCalled(0),
+        workFunction(nullptr),
         workReturn(GEARMAN_NO_JOBS),
         waitReturn(GEARMAN_NO_JOBS),
         serversReturn(GEARMAN_SUCCESS),
-        jobsReturn(GEARMAN_SUCCESS) {}
+        jobsReturn(GEARMAN_SUCCESS),
+        gearmanClient(nullptr) {}
 
     gearman_worker_st* create(gearman_worker_st *worker) {
         return reinterpret_cast<gearman_worker_st*>(1);
@@ -41,6 +43,9 @@ public:
             throw new std::out_of_range("terminate run loop");
         }
 
+        if (this->workFunction && this->gearmanClient) {
+            return this->workFunction(gearmanClient);
+        }
         return this->workReturn;
     }
 
@@ -51,7 +56,20 @@ public:
 
     void configure(gearman_return_t work, gearman_return_t wait,
                    gearman_return_t servers, gearman_return_t jobs) {
+        this->workFunction = nullptr;
         this->workReturn = work;
+        this->waitReturn = wait;
+        this->serversReturn = servers;
+        this->jobsReturn = jobs;
+    }
+
+    void configure_with_work_function(gearman_return_t (*work)(GearmanClient *),
+                             GearmanClient* client,
+                             gearman_return_t wait,
+                             gearman_return_t servers, gearman_return_t jobs) {
+        this->workFunction = work;
+        this->gearmanClient = client;
+        this->workReturn = GEARMAN_NO_JOBS;
         this->waitReturn = wait;
         this->serversReturn = servers;
         this->jobsReturn = jobs;
@@ -59,23 +77,28 @@ public:
 
     void reset() {
         this->waitCalled = false;
+        this->workFunction = nullptr;
         this->workReturn = GEARMAN_NO_JOBS;
         this->waitReturn = GEARMAN_NO_JOBS;
         this->serversReturn = GEARMAN_SUCCESS;
         this->jobsReturn = GEARMAN_SUCCESS;
         this->timesWorkCalled = 0;
         this->timesWaitCalled = 0;
+        this->gearmanClient = nullptr;
     }
 
     bool waitCalled;
     uint32_t timesWorkCalled, timesWaitCalled;
 
+
 private:
+    gearman_return_t (*workFunction)(GearmanClient *);
     gearman_return_t workReturn;
     gearman_return_t waitReturn;
     gearman_return_t serversReturn;
     gearman_return_t jobsReturn;
 
+    GearmanClient *gearmanClient;
 };
 
 class ConfigurableMockGearmanJobLib : public mock::libs::gearman::MockGearmanJobLib {
@@ -730,4 +753,63 @@ TEST_F(GearmanClientTest, TestProcessErrorMetricOnTimeout) {
 
     EXPECT_EQ(mockMetricProxy->getJobTimeoutCount("testcase_pool_name", "mocked_function_name"), 1);
     EXPECT_EQ(mockMetricProxy->getJobErrorCount("testcase_pool_name", "mocked_function_name"), 1);
+}
+
+
+// TestThreadMetrics ties together GearmanClient::run and GearmanClient::processJob
+// such a manner that they are invoked in the correct order with all the mocks
+// enabled.  By doing this we can record the times the 4 thread gauge events:
+//   1) a thread starting,
+//   2) the transition from idle to working,
+//   3) the transition from working to idle,
+//   4) a thread ending
+// amd ensure that these events occur in the expected order
+TEST_F(GearmanClientTest, TestThreadMetrics) {
+
+    mockCurlLib.configure(CURLE_OK, CURLE_OK, CURLE_OK, CURL_FORMADD_OK);
+
+    long ok(200);
+    mockCurlLib.configureGetInfo(CURLINFO_RESPONSE_CODE, &ok);
+
+    std::string testResponseValue("TEST RESPONSE");
+    std::stringstream goodResponseStream;
+    goodResponseStream << "{\"gearman_ret\": " << GEARMAN_SUCCESS
+                       << ", \"response_string\": \"" << testResponseValue
+                       << "\"}";
+
+    std::string goodResponse(goodResponseStream.str());
+    auto writeFunc = [goodResponse] (void *userData) {
+        curl_write_func(
+                const_cast<char*>(goodResponse.c_str()), goodResponse.length(),
+                1, userData
+        );
+    };
+
+    mockCurlLib.configureSetOpt(CURLOPT_WRITEDATA, writeFunc);
+
+    auto *client = new GearmanClient(mockThreadRegistry, mockMetricProxyPoolWrapper, StringSet(), StringSet(), "");
+
+    auto workFunction = [](GearmanClient *client) {
+        std::string gearmanReturnValue;
+        client->processJob(nullptr, gearmanReturnValue);
+        return GEARMAN_SUCCESS;
+    };
+
+    mockGearmanWorkerLib.configure_with_work_function(
+            workFunction, client, GEARMAN_SUCCESS,
+            GEARMAN_SUCCESS, GEARMAN_SUCCESS
+    );
+
+    client->run();
+
+    delete client;
+
+    auto threadStart = mockMetricProxy->popThreadStart("testcase_pool_name");
+    auto workStart = mockMetricProxy->popWorkStart("testcase_pool_name", "mocked_function_name");
+    auto workEnd = mockMetricProxy->popWorkEnd("testcase_pool_name", "mocked_function_name");
+    auto threadEnd = mockMetricProxy->popThreadEnd("testcase_pool_name");
+
+    EXPECT_GT(workStart, threadStart);
+    EXPECT_GT(workEnd, workStart);
+    EXPECT_GT(threadEnd, workEnd);
 }

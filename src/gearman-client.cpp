@@ -172,7 +172,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     struct curl_httppost *lastptr = nullptr;
     struct curl_slist *headerlist = nullptr;
     gearman_return_t gearman_ret = GEARMAN_SUCCESS;
-    high_resolution_clock::time_point hrc_start = std::chrono::high_resolution_clock::now();
+    high_resolution_clock::time_point hrc_start = high_resolution_clock::now();
     time_t start_ts = time(nullptr);
     StringstreamWriter raw_resp;
     const char *job_function_name = static_cast<const char *>(gearman_job_function_name(job_ptr));
