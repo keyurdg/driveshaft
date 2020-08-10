@@ -14,4 +14,4 @@ add_executable(driveshaft-bin ./main.cpp)
 set_target_properties(driveshaft-bin PROPERTIES OUTPUT_NAME driveshaft)
 target_link_libraries(driveshaft-bin driveshaft ${DRIVESHAFT_LINK_LIBRARIES})
 
-install(TARGETS driveshaft DESTINATION bin)
+install(TARGETS driveshaft-bin DESTINATION bin)
