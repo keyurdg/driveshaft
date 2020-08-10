@@ -38,6 +38,7 @@
 #include <condition_variable>
 #include "common-defs.h"
 #include "thread-registry.h"
+#include "metric-proxy.h"
 #include "main-loop.h"
 #include "thread-loop.h"
 #include "gearman-client.h"
@@ -53,12 +54,14 @@ static enum class ThreadStartState {
 } s_new_thread_wakeup = ThreadStartState::INIT;
 
 static void gearman_thread_delegate(ThreadRegistryPtr registry,
+                            MetricProxyPtr metrics,
                             std::string pool,
                             StringSet servers_list,
                             StringSet jobs_list,
                             std::string http_uri) noexcept {
     std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-    GearmanClient *client = new GearmanClient(registry, servers_list,
+    const MetricProxyPoolWrapperPtr metricsPoolWrapper = MetricProxyPoolWrapper::wrap(pool, metrics);
+    GearmanClient *client = new GearmanClient(registry, metricsPoolWrapper, servers_list,
                                               jobs_list, http_uri);
     ThreadLoop loop(registry, pool, client);
     s_new_thread_wakeup = ThreadStartState::SUCCESS;
@@ -70,8 +73,9 @@ static void gearman_thread_delegate(ThreadRegistryPtr registry,
 
 class ThreadPoolWatcher : public PoolWatcher {
 public:
-    ThreadPoolWatcher(ThreadRegistryPtr registry) :
-        m_thread_registry(registry) {
+    ThreadPoolWatcher(ThreadRegistryPtr registry, MetricProxyPtr metrics) :
+         m_thread_registry(registry)
+        ,m_metrics_proxy(metrics) {
     }
 
     virtual void inform(uint32_t config_worker_count, const std::string& pool_name,
@@ -91,6 +95,7 @@ public:
 
                 std::thread t(gearman_thread_delegate,
                               m_thread_registry,
+                              m_metrics_proxy,
                               pool_name, server_list,
                               jobs_list, processing_uri);
 
@@ -102,13 +107,15 @@ public:
 
 private:
     ThreadRegistryPtr m_thread_registry;
+    MetricProxyPtr m_metrics_proxy;
 };
 
-MainLoop::MainLoop(const std::string& config_file) :
+MainLoop::MainLoop(const std::string &config_file, const std::string &exporter_addr) :
     m_config_filename(config_file),
     m_config(),
     m_thread_registry(new ThreadRegistry),
-    m_pool_watcher(new ThreadPoolWatcher(m_thread_registry)) {
+    m_metric_proxy(new MetricProxy(exporter_addr)),
+    m_pool_watcher(new ThreadPoolWatcher(m_thread_registry, m_metric_proxy)) {
     if (!setupSignals()) {
         throw std::runtime_error("Unable to setup signals");
     }

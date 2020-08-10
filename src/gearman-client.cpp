@@ -119,8 +119,10 @@ void gearman_client_deleter(gearman_worker_st *ptr) noexcept {
     gearman_worker_free(ptr);
 }
 
-GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server_list, const StringSet& jobs_list, const std::string& uri)
+GearmanClient::GearmanClient(ThreadRegistryPtr registry, MetricProxyPoolWrapperPtr metrics, const StringSet &server_list,
+                             const StringSet &jobs_list, const std::string &uri)
                              : m_registry(registry)
+                             , m_metrics(metrics)
                              , m_http_uri(uri)
                              , m_worker_ptr(gearman_worker_create(nullptr), gearman_client_deleter)
                              , m_json_parser(nullptr)
@@ -149,8 +151,18 @@ GearmanClient::GearmanClient(ThreadRegistryPtr registry, const StringSet& server
     jsonfactory.strictMode(&jsonfactory.settings_);
     m_json_parser.reset(jsonfactory.newCharReader());
 
+    m_metrics->reportThreadStarted();
+
     m_state = State::GRAB_JOB;
 }
+
+GearmanClient::~GearmanClient() {
+    m_metrics->reportThreadEnded();
+}
+
+using std::chrono::high_resolution_clock;
+using std::chrono::duration;
+using std::chrono::duration_cast;
 
 gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string& return_string) noexcept {
     CURL *curl;
@@ -160,6 +172,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     struct curl_httppost *lastptr = nullptr;
     struct curl_slist *headerlist = nullptr;
     gearman_return_t gearman_ret = GEARMAN_SUCCESS;
+    high_resolution_clock::time_point hrc_start = high_resolution_clock::now();
     time_t start_ts = time(nullptr);
     StringstreamWriter raw_resp;
     const char *job_function_name = static_cast<const char *>(gearman_job_function_name(job_ptr));
@@ -174,6 +187,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     static const char expect_buf[] = "Expect:";
 
     m_registry->setThreadState(std::this_thread::get_id(), std::string().append("job_handle=").append(job_handle).append(" job_unique=").append(job_unique));
+    m_metrics->reportThreadStartingWork(job_function_name);
 
     curl = curl_easy_init();
     if (!curl) {
@@ -274,6 +288,9 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
     curlrc = curl_easy_perform(curl);
     if (curlrc != CURLE_OK) {
         LOG4CXX_ERROR(ThreadLogger, "Failed to perform curl. Error: " << curl_easy_strerror(curlrc) << " Message: " << error_buf);
+        if (curlrc == CURLE_ABORTED_BY_CALLBACK) {
+            m_metrics->reportJobTimeout(job_function_name);
+        }
         goto error;
     } else {
         /* check HTTP response code */
@@ -281,6 +298,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
         if (http_code != 200) {
             LOG4CXX_ERROR(ThreadLogger, "Invalid HTTP response code. Expecting 200, got " << http_code);
+            m_metrics->reportJobHttpError(job_function_name, http_code);
             goto error;
         }
     }
@@ -308,6 +326,10 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
         gearman_ret = (gearman_return_t)(tree["gearman_ret"].asInt());
         return_string.append(tree["response_string"].asString());
 
+        high_resolution_clock::time_point hrc_done = high_resolution_clock::now();
+        duration<double> delay = duration_cast<duration<double>>(hrc_done - hrc_start);
+        m_metrics->reportJobSuccess(job_function_name, delay.count());
+
         LOG4CXX_INFO(ThreadLogger, "Finished job: function=" << job_function_name << " handle=" << job_handle << " unique=" << job_unique
                                    << " workload=" << job_workload
                                    << " return_code=" << gearman_ret << " response_string=" << return_string);
@@ -317,6 +339,7 @@ gearman_return_t GearmanClient::processJob(gearman_job_st *job_ptr, std::string&
 
 error:
     gearman_ret = GEARMAN_WORK_FAIL;
+    m_metrics->reportJobError(job_function_name);
 cleanup:
     curl_easy_cleanup(curl);
     curl_formfree(formpost);
@@ -348,6 +371,7 @@ void GearmanClient::run() {
                 LOG4CXX_INFO(ThreadLogger, "Job failed with error " << ret);
                 /* fall through */
             case GEARMAN_SUCCESS:
+                m_metrics->reportThreadWorkComplete();
                 m_registry->setThreadState(std::this_thread::get_id(), std::string("Waiting for work"));
                 return; // The caller should decide whether to get more jobs or do other things
 
@@ -394,5 +418,6 @@ void GearmanClient::run() {
         }
     }
 }
+
 
 } // namespace Driveshaft
