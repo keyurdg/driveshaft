@@ -26,7 +26,7 @@ $ sudo make install
 ```
 
 # Configuration
-driveshaft takes two arguments:
+driveshaft takes several arguments:
 ```
 $ driveshaft
 Allowed options:
@@ -40,7 +40,8 @@ Allowed options:
                             (in seconds)
   --loop_timeout arg        how long to wait for a response from gearmand before
                             restarting event-loop (in seconds)
-  --status_port arg         port to listen on to return status
+  --exporter_addr arg       (=0.0.0.0:8888) the address:port on which to launch a
+                            prometheus exporter to publish metrics
 ```
 
 ## jobsconfig
