@@ -40,7 +40,6 @@
 #include "thread-registry.h"
 #include "main-loop.h"
 #include "thread-loop.h"
-#include "status-loop.h"
 #include "gearman-client.h"
 
 namespace Driveshaft {
@@ -141,8 +140,6 @@ void MainLoop::doShutdown(uint32_t wait) noexcept {
 }
 
 void MainLoop::run() {
-    startStatusThread();
-
     Json::CharReaderBuilder jsonfactory;
     jsonfactory.strictMode(&jsonfactory.settings_);
     std::shared_ptr<Json::CharReader> json_parser(jsonfactory.newCharReader());
@@ -192,50 +189,6 @@ bool MainLoop::setupSignals() const noexcept {
     }
 
     return true;
-}
-
-static void status_thread_delegate(ThreadRegistryPtr registry) {
-    using boost::asio::ip::tcp;
-    using namespace boost::asio;
-
-    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-
-    auto return_status_functor = [&lock](ThreadStartState status) {
-        s_new_thread_wakeup = status;
-        lock.unlock();
-        s_new_thread_cond.notify_one();
-    };
-
-    try {
-        io_service io_service;
-        StatusLoop loop(io_service, registry);
-
-        // this means we bound without issues
-        // return success to caller and don't use them anymore
-        return_status_functor(ThreadStartState::SUCCESS);
-
-        io_service.run();
-    } catch (std::exception& e) {
-        LOG4CXX_ERROR(StatusLogger, "Unable to create status loop due to error: " << e.what());
-        return_status_functor(ThreadStartState::FAILURE);
-    }
-}
-
-void MainLoop::startStatusThread() {
-    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-    s_new_thread_wakeup = ThreadStartState::INIT;
-
-    std::thread t(status_thread_delegate,
-                  m_thread_registry);
-
-    s_new_thread_cond.wait(lock, []{return s_new_thread_wakeup != ThreadStartState::INIT;});
-
-    if (s_new_thread_wakeup == ThreadStartState::SUCCESS) {
-        t.detach();
-    } else {
-        t.join();
-        throw std::runtime_error("cannot start status thread");
-    }
 }
 
 } // namespace Driveshaft
