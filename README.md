@@ -104,10 +104,13 @@ Expressed in seconds, this is how long to wait for a job from gearmand before re
 the event loop. It is passed in to `gearman_worker_set_timeout`. This also influences the
 shutdown wait durations (hard shutdown is 2x, and graceful is 4x this value).
 
-## status port
-The server listens on `status_port` and currently supports the command `threads`.
-For every running thread, the server returns back text formatted as
-`<Thread-ID>\t<Pool-Name>\t<Shutdown-Flag>\tjob_handle=<Job-Handle> job_unique=<Job-Unique>\r\n`
+## metrics
+The server runs a prometheus exporter interface over http at the address and port specified by the `exporter_addr` command line option. The following metrics are exposed:
+1. histogram `driveshaft_job_duration`: labelled by `pool` and `function`.  Aggregates the duration of successful jobs.
+2. counter `driveshaft_http_errors`: labelled by `pool`, `function` and `http_status`
+3. counter `driveshaft_timeouts`: labelled by `pool` and `function`
+4. counter `driveshaft_errors`: labelled by `pool` and `function`, includes errors also counted in `driveshaft_http_errors` and `driveshaft_timeouts` as well as any other errors.
+5. counter `driveshaft_threads`: labelled by `status` = `{idle, busy}`, `pool` and `function`.  Idle threads do not include the `function` label.
 
 # Design
 1. Jobs are grouped into pools and every pool has a `worker_count` setting in order
