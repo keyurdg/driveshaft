@@ -12,6 +12,7 @@
 * libcurl(-devel)
 * boost(-devel) 1.48 or later
 * gcc 4.8 or later
+* prometheus-cpp 0.9.0 or later
 
 ## Build
 ```

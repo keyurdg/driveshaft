@@ -24,8 +24,21 @@ sudo apt-get install build-essential \
 First, you'll need to compile and install [PrometheusC++](https://github.com/jupp0r/prometheus-cpp)
 
 ```bash
-FIX THIS
-make install
+
+# checkout version 0.9.0
+git clone --depth=50 git@github.com:jupp0r/prometheus-cpp.git jupp0r/prometheus-cpp
+cd jupp0r/prometheus-cpp
+git fetch origin refs/tags/v0.9.0:
+git checkout -qf FETCH_HEAD
+
+# fetch third-party dependencies
+git submodule update --init && cmake -DBUILD_SHARED_LIBS=ON && sudo make install && popd
+
+# run cmake
+cmake -DBUILD_SHARED_LIBS=ON
+
+# install prometheus-cpp library
+sudo make install
 ```
 
 Now, you're good to go on building driveshaft.
