@@ -54,7 +54,7 @@ public:
 class MockGearmanJobLib {
 public:
     virtual const char* functionName(const gearman_job_st *job) {
-        return "";
+        return "mocked_function_name";
     }
 
     virtual const char* handle(const gearman_job_st *job) {

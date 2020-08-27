@@ -2,11 +2,11 @@ language: cpp
 compiler:
 - gcc
 script:
-- cmake . && make && make test
+- cmake . && make && ARGS=-V make test
 # TODO ./tests/integration.sh
 sudo: required
 before_install:
-- wget -O /tmp/snyder.deb 'https://packagecloud.io/mrtazz/snyder/packages/ubuntu/trusty/snyder_0.4.3-1_amd64.deb/download.deb' && sudo dpkg -i /tmp/snyder.deb 
-- sudo apt-get install build-essential clang liblog4cxx10-dev libboost-all-dev php-pear php5-dev libcurl4-openssl-dev
+- sudo apt-get install build-essential clang liblog4cxx10-dev libboost-all-dev txt2man php-pear php-all-dev libcurl4-openssl-dev
 - sudo apt-get install libgearman-dev gearman-job-server gearman libgearman7
+- pushd ../.. && git clone --depth=50 https://github.com/jupp0r/prometheus-cpp.git jupp0r/prometheus-cpp && cd jupp0r/prometheus-cpp && git fetch origin "refs/tags/v0.9.0:" && git checkout -qf FETCH_HEAD && git submodule update --init && cmake -DBUILD_SHARED_LIBS=ON && make && sudo make install && popd
 # TODO install PHP gearman extension
