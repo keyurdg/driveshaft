@@ -5,7 +5,9 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
 
 # package information
 set(PACKAGE_NAME      "driveshaft")
-set(PACKAGE_VERSION   "0.2.0")
+if (NOT DEFINED PACKAGE_VERSION)
+  set(PACKAGE_VERSION   "0.7.0")
+endif()
 set(PACKAGE_STRING    "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 set(PACKAGE_TARNAME   "${PACKAGE_NAME}-${PACKAGE_VERSION}")
 set(PACKAGE_BUGREPORT "https://github.com/keyurdg/driveshaft/issues")
@@ -38,14 +40,13 @@ mark_as_advanced(CLEAR CMAKE_INSTALL_PREFIX)
 ## Uncomment the below to disable optimizations for debugging
 #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
+configure_file(driveshaft-version.h.in driveshaft-version.h @ONLY)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 add_subdirectory(src bin/)
 
 enable_testing()
 add_subdirectory(tests bin/test/)
-
-file(WRITE src/version.h
-  "\#ifndef DRIVESHAFT_VERSION\n\#define DRIVESHAFT_VERSION \"@PACKAGE_VERSION@\"\n\#endif\n"
-)
 
 add_custom_command(OUTPUT driveshaft.1
   COMMAND txt2man -t "driveshaft" -s 1 -v "User Manual" driveshaft.1.txt > driveshaft.1

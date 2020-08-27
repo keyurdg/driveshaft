@@ -45,7 +45,7 @@
 #include <log4cxx/helpers/exception.h>
 #include "common-defs.h"
 #include "main-loop.h"
-#include "version.h"
+#include <driveshaft-version.h>
 #include "pidfile.h"
 
 namespace Driveshaft {
@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
         if (vm.count("version")) {
-            std::cout << "driveshaft version: " DRIVESHAFT_VERSION << std::endl;
+            std::cout << "driveshaft version: " PACKAGE_VERSION << std::endl;
             return 1;
         }
 
