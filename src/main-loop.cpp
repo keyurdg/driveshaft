@@ -38,9 +38,9 @@
 #include <condition_variable>
 #include "common-defs.h"
 #include "thread-registry.h"
+#include "metric-proxy.h"
 #include "main-loop.h"
 #include "thread-loop.h"
-#include "status-loop.h"
 #include "gearman-client.h"
 
 namespace Driveshaft {
@@ -54,12 +54,14 @@ static enum class ThreadStartState {
 } s_new_thread_wakeup = ThreadStartState::INIT;
 
 static void gearman_thread_delegate(ThreadRegistryPtr registry,
+                            MetricProxyPtr metrics,
                             std::string pool,
                             StringSet servers_list,
                             StringSet jobs_list,
                             std::string http_uri) noexcept {
     std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-    GearmanClient *client = new GearmanClient(registry, servers_list,
+    const MetricProxyPoolWrapperPtr metricsPoolWrapper = MetricProxyPoolWrapper::wrap(pool, metrics);
+    GearmanClient *client = new GearmanClient(registry, metricsPoolWrapper, servers_list,
                                               jobs_list, http_uri);
     ThreadLoop loop(registry, pool, client);
     s_new_thread_wakeup = ThreadStartState::SUCCESS;
@@ -71,8 +73,9 @@ static void gearman_thread_delegate(ThreadRegistryPtr registry,
 
 class ThreadPoolWatcher : public PoolWatcher {
 public:
-    ThreadPoolWatcher(ThreadRegistryPtr registry) :
-        m_thread_registry(registry) {
+    ThreadPoolWatcher(ThreadRegistryPtr registry, MetricProxyPtr metrics) :
+         m_thread_registry(registry)
+        ,m_metrics_proxy(metrics) {
     }
 
     virtual void inform(uint32_t config_worker_count, const std::string& pool_name,
@@ -92,6 +95,7 @@ public:
 
                 std::thread t(gearman_thread_delegate,
                               m_thread_registry,
+                              m_metrics_proxy,
                               pool_name, server_list,
                               jobs_list, processing_uri);
 
@@ -103,13 +107,15 @@ public:
 
 private:
     ThreadRegistryPtr m_thread_registry;
+    MetricProxyPtr m_metrics_proxy;
 };
 
-MainLoop::MainLoop(const std::string& config_file) :
+MainLoop::MainLoop(const std::string &config_file, const std::string &exporter_addr) :
     m_config_filename(config_file),
     m_config(),
     m_thread_registry(new ThreadRegistry),
-    m_pool_watcher(new ThreadPoolWatcher(m_thread_registry)) {
+    m_metric_proxy(new MetricProxy(exporter_addr)),
+    m_pool_watcher(new ThreadPoolWatcher(m_thread_registry, m_metric_proxy)) {
     if (!setupSignals()) {
         throw std::runtime_error("Unable to setup signals");
     }
@@ -141,8 +147,6 @@ void MainLoop::doShutdown(uint32_t wait) noexcept {
 }
 
 void MainLoop::run() {
-    startStatusThread();
-
     Json::CharReaderBuilder jsonfactory;
     jsonfactory.strictMode(&jsonfactory.settings_);
     std::shared_ptr<Json::CharReader> json_parser(jsonfactory.newCharReader());
@@ -192,50 +196,6 @@ bool MainLoop::setupSignals() const noexcept {
     }
 
     return true;
-}
-
-static void status_thread_delegate(ThreadRegistryPtr registry) {
-    using boost::asio::ip::tcp;
-    using namespace boost::asio;
-
-    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-
-    auto return_status_functor = [&lock](ThreadStartState status) {
-        s_new_thread_wakeup = status;
-        lock.unlock();
-        s_new_thread_cond.notify_one();
-    };
-
-    try {
-        io_service io_service;
-        StatusLoop loop(io_service, registry);
-
-        // this means we bound without issues
-        // return success to caller and don't use them anymore
-        return_status_functor(ThreadStartState::SUCCESS);
-
-        io_service.run();
-    } catch (std::exception& e) {
-        LOG4CXX_ERROR(StatusLogger, "Unable to create status loop due to error: " << e.what());
-        return_status_functor(ThreadStartState::FAILURE);
-    }
-}
-
-void MainLoop::startStatusThread() {
-    std::unique_lock<std::mutex> lock(s_new_thread_mutex);
-    s_new_thread_wakeup = ThreadStartState::INIT;
-
-    std::thread t(status_thread_delegate,
-                  m_thread_registry);
-
-    s_new_thread_cond.wait(lock, []{return s_new_thread_wakeup != ThreadStartState::INIT;});
-
-    if (s_new_thread_wakeup == ThreadStartState::SUCCESS) {
-        t.detach();
-    } else {
-        t.join();
-        throw std::runtime_error("cannot start status thread");
-    }
 }
 
 } // namespace Driveshaft

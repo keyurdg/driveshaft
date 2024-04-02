@@ -43,27 +43,20 @@
 #include <log4cxx/propertyconfigurator.h>
 #include <log4cxx/xml/domconfigurator.h>
 #include <log4cxx/helpers/exception.h>
-#include <snyder/metrics_registry.h>
 #include "common-defs.h"
 #include "main-loop.h"
-#include "version.h"
+#include <driveshaft-version.h>
 #include "pidfile.h"
 
 namespace Driveshaft {
 
 static const char* MAIN_LOGGER_NAME = "Main";
 static const char* THREAD_LOGGER_NAME = "Thread";
-static const char* STATUS_LOGGER_NAME = "Status";
-
-// globally accesible metrics registry
-std::shared_ptr<Snyder::MetricsRegistry> MetricsRegistry(new Snyder::MetricsRegistry);
 
 /* Define the externs from common-defs */
 std::atomic_bool g_force_shutdown(false);
 log4cxx::LoggerPtr MainLogger(log4cxx::Logger::getLogger(MAIN_LOGGER_NAME));
 log4cxx::LoggerPtr ThreadLogger(log4cxx::Logger::getLogger(THREAD_LOGGER_NAME));
-log4cxx::LoggerPtr StatusLogger(log4cxx::Logger::getLogger(STATUS_LOGGER_NAME));
-uint32_t STATUS_PORT;
 uint32_t MAX_JOB_RUNNING_TIME;
 uint32_t GEARMAND_RESPONSE_TIMEOUT; // This drives all the other timeouts below
 uint32_t LOOP_SLEEP_DURATION;
@@ -131,6 +124,7 @@ int main(int argc, char **argv) {
     std::string username;
     std::string pid_filename;
     bool daemonize = false;
+    std::string exporter_addr;
 
     /* Parse command line opts */
     namespace po = boost::program_options;
@@ -145,14 +139,14 @@ int main(int argc, char **argv) {
             ("logconfig", po::value<std::string>(&log_config_file)->required(), "log config file path")
             ("max_running_time", po::value<uint32_t>(&Driveshaft::MAX_JOB_RUNNING_TIME)->required(), "how long can a job run before it is considered failed (in seconds)")
             ("loop_timeout", po::value<uint32_t>(&Driveshaft::GEARMAND_RESPONSE_TIMEOUT)->required(), "how long to wait for a response from gearmand before restarting event-loop (in seconds)")
-            ("status_port", po::value<uint32_t>(&Driveshaft::STATUS_PORT)->required(), "port to listen on to return status")
+            ("exporter_addr", po::value<std::string>(&exporter_addr)->default_value("0.0.0.0:8888"), "the address:port on which to launch a prometheus exporter to publish metrics")
     ;
 
     try {
         po::variables_map vm;
         po::store(po::parse_command_line(argc, argv, desc), vm);
         if (vm.count("version")) {
-            std::cout << "driveshaft version: " DRIVESHAFT_VERSION << std::endl;
+            std::cout << "driveshaft version: " PACKAGE_VERSION << std::endl;
             return 1;
         }
 
@@ -209,7 +203,7 @@ int main(int argc, char **argv) {
         LOG4CXX_INFO(Driveshaft::MainLogger, "Starting up with gearmand response timeout=" << Driveshaft::GEARMAND_RESPONSE_TIMEOUT
                                              << " and max running time=" << Driveshaft::MAX_JOB_RUNNING_TIME);
 
-        Driveshaft::MainLoop loop(jobs_config_file);
+        Driveshaft::MainLoop loop(jobs_config_file, exporter_addr);
         loop.run();
     } catch (std::exception& e) {
         std::cout << "MainLoop threw exception: " << e.what() << std::endl;
