@@ -53,8 +53,10 @@ void configureLoggersForTesting(const boost::program_options::variables_map &opt
                 log4cxx::LayoutPtr(new log4cxx::SimpleLayout())
                 );
 
-        testMainLogger->addAppender(consoleAppender);
-        testThreadLogger->addAppender(consoleAppender);
+        log4cxx::AppenderPtr appenderPtr(consoleAppender);
+
+        testMainLogger->addAppender(appenderPtr);
+        testThreadLogger->addAppender(appenderPtr);
         targetLevel = currentLevel;
     }
 
