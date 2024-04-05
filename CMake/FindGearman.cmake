@@ -11,4 +11,5 @@ ELSE()
 ENDIF()
 
 include_directories(${GEARMAN_INCLUDE_DIR})
+link_directories(${GEARMAN_LIBRARY})
 LIST(APPEND DRIVESHAFT_LINK_LIBRARIES gearman)
